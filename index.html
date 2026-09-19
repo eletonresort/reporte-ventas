@@ -225,6 +225,7 @@
       </div>
       <div class="acciones">
         <button class="btn btn-primario" id="btnCargar">Cargar reporte del mes</button>
+        <button class="btn btn-linea" id="btnSync">Actualizar desde la planilla</button>
         <button class="btn btn-linea" id="btnCopiar">Copiar para la planilla</button>
         <button class="btn btn-linea" id="btnVaciar">Vaciar datos</button>
       </div>
@@ -320,6 +321,10 @@
           <label for="pValorMenor">Valor Menor por plaza</label>
           <input type="number" id="pValorMenor" step="5">
         </div>
+        <div class="campo" style="flex:1 1 340px">
+          <label for="pUrl">Enlace de la planilla (Apps Script, termina en /exec)</label>
+          <input type="text" id="pUrl" style="width:100%" placeholder="https://script.google.com/macros/s/.../exec">
+        </div>
         <button class="btn btn-chico" id="btnParam">Guardar parámetros</button>
         <p class="ayuda">Si el reporte trae la columna “Valor Menor sin IVA”, se usa ese valor por reserva; el parámetro cubre las filas que vengan vacías. El resto de las fórmulas son las del cálculo del hotel.</p>
       </div>
@@ -334,7 +339,8 @@
 <script>
 const SEED = [["24/06/2026","4112173789775",3,0,11,100000.0,6270000.0,0.0],["29/06/2026","2845821737030",8,3,4,100000.0,6878000.0,0.0],["29/06/2026","2627176549623",8,4,4,100000.0,7144000.0,0.0],["29/06/2026","9366843358126",9,3,4,100000.0,7277000.0,0.0],["29/06/2026","4253619296345",14,0,4,100000.0,10184000.0,91960.0],["30/06/2026","9760646237969",5,0,3,100000.0,2692200.0,0.0],["30/06/2026","5757763550960",4,0,3,100000.0,2160000.0,282920.0],["30/06/2026","1620705999300",2,0,3,100000.0,1200000.0,0.0],["05/07/2026","1457911476939",6,1,5,100000.0,5248749.63,0.0],["21/07/2026","5865865308420",2,1,3,100000.0,1560000.0,0.0],["26/07/2026","8979468651759",2,2,3,100000.0,2112000.0,0.0],["30/07/2026","7191520842982",2,0,3,100000.0,1428000.0,0.0],["06/08/2026","1448500240196",2,0,4,100000.0,2196462.8,0.0],["07/08/2026","7600722666476",2,2,4,100000.0,2824000.0,0.0],["11/08/2026","9574981830868",12,4,5,100000.0,12088450.0,-76500.0],["20/08/2026","4793058727543",4,0,6,100000.0,4800000.0,0.0],["21/08/2026","8847076676362",2,1,4,100000.0,3160000.0,0.0],["23/08/2026","4501876641102",2,2,4,100000.0,2824000.0,0.0],["24/08/2026","2884021020194",3,1,7,100000.0,4830000.0,0.0],["24/08/2026","2783962579756",4,0,3,100000.0,2220000.0,0.0],["24/08/2026","2134414770143",6,3,3,100000.0,4503840.0,0.0],["24/08/2026","5199367671764",2,0,3,100000.0,1428000.0,0.0],["24/08/2026","4276671602361",3,1,4,100000.0,3024000.0,0.0],["24/08/2026","3299630979020",10,0,3,100000.0,5700000.0,3965775.0],["24/08/2026","3861556846224",2,2,3,100000.0,1980000.0,0.0],["25/08/2026","8874053631326",4,0,3,100000.0,2720000.0,0.0],["25/08/2026","2919075959369",2,2,3,100000.0,1920000.0,0.0],["26/08/2026","2799167310464",4,0,3,100000.0,1817070.0,0.0],["26/08/2026","9290515999869",6,1,5,100000.0,6500000.0,1169163.0],["26/08/2026","3978962983300",3,1,10,100000.0,5791640.0,0.0],["27/08/2026","9975103793416",3,2,3,100000.0,2760000.0,1016400.0],["27/08/2026","5271706343285",2,0,5,100000.0,2100000.0,0.0],["27/08/2026","3849214527875",1,0,5,100000.0,2000000.0,1210000.0],["28/08/2026","3463178564461",2,0,3,100000.0,1260000.0,0.0],["28/08/2026","1367741949951",2,0,3,100000.0,1344000.0,0.0],["28/08/2026","6705039651359",2,0,7,100000.0,2940000.0,0.0],["29/08/2026","8874066587222",9,3,4,100000.0,8079700.0,0.0],["29/08/2026","6253290997774",2,0,5,100000.0,2100000.0,0.0],["29/08/2026","6725814445277",6,0,3,100000.0,3093930.0,0.0],["30/08/2026","9964566005962",14,3,3,100000.0,11556000.0,0.0],["30/08/2026","2248259050371",3,0,3,100000.0,1770000.0,0.0],["30/08/2026","3429759608727",2,0,3,100000.0,1320000.0,0.0],["30/08/2026","6552163927578",2,0,3,100000.0,1031310.0,0.0],["31/08/2026","3845069496788",2,0,9,100000.0,3241635.0,0.0],["31/08/2026","6067048264148",3,0,4,100000.0,2532000.0,0.0],["31/08/2026","9206997531153",4,0,4,100000.0,4048000.0,0.0],["31/08/2026","2940666038815",10,4,3,100000.0,7620000.0,0.0],["01/09/2026","4860979439321",12,2,4,100000.0,11360000.0,0.0],["01/09/2026","2797892076291",3,0,3,100000.0,1770000.0,0.0],["03/09/2026","4276759618197",5,1,3,100000.0,3431509.0,0.0],["03/09/2026","8125534570857",3,0,6,100000.0,3716000.0,0.0],["04/09/2026","8635800062077",5,0,4,100000.0,5040000.0,0.0],["05/09/2026","2690958484009",3,0,3,100000.0,2062620.0,0.0],["06/09/2026","8825347534897",11,2,4,100000.0,8826704.0,0.0],["07/09/2026","5525416952383",5,2,4,100000.0,5140000.0,4932920.0],["08/09/2026","1716503369224",8,5,3,100000.0,7836000.0,0.0],["09/09/2026","7448522941430",8,1,3,100000.0,4223460.0,0.0],["11/09/2026","5202126728107",2,0,8,100000.0,3440000.0,0.0],["11/09/2026","6233421772250",3,0,5,100000.0,2538987.0,0.0],["12/09/2026","1418929494690",7,2,3,100000.0,5520000.0,0.0],["12/09/2026","9920075087688",2,0,3,100000.0,1710000.0,2069100.0],["13/09/2026","8010352668218",3,1,4,100000.0,2920000.0,0.0],["16/09/2026","3330268390435",2,0,7,100000.0,2520000.0,0.0],["17/09/2026","8351570746133",14,4,4,100000.0,13040000.0,15778400.0],["17/09/2026","2762702679857",4,0,4,100000.0,3760000.0,4549600.0],["18/09/2026","4424500957090",6,2,7,100000.0,10220000.0,12366200.0],["18/09/2026","9964711025680",11,5,3,100000.0,9738000.0,11782980.0],["18/09/2026","5303600222803",5,0,5,100000.0,5150000.0,6231500.0]];
 
-const P_DEF = { menorSinIva: 100000, alicuota: 0.0063, valorMenor: 715 };
+const P_DEF = { menorSinIva: 100000, alicuota: 0.0063, valorMenor: 715, url: '' };
+const TOKEN_PLANILLA = 'eleton-plazas-2026';   // tiene que coincidir con el TOKEN del script
 let params = Object.assign({}, P_DEF);
 let datos = [];
 
@@ -347,6 +353,8 @@ let valoresVisibles = false;
 
 /* Objetivos de venta por mes. En la planilla se cargan en la hoja "Objetivos". */
 let objetivos = [
+  { mes: '2026-08', reservas: 18,  ticket: 3831922, total: 68974604 },
+  { mes: '2026-09', reservas: 39,  ticket: 3215897, total: 125419995 },
   { mes: '2026-10', reservas: 68,  ticket: 2483503, total: 168878218 },
   { mes: '2026-11', reservas: 119, ticket: 2539844, total: 302241457 },
   { mes: '2026-12', reservas: 196, ticket: 2412583, total: 472866368 }
@@ -367,12 +375,15 @@ function guardar(){
   try{
     localStorage.setItem('eleton_plazas_datos', JSON.stringify(datos));
     localStorage.setItem('eleton_plazas_param', JSON.stringify(params));
+    localStorage.setItem('eleton_plazas_obj', JSON.stringify(objetivos));
   }catch(e){}
 }
 function recuperar(){
   try{
     const p = localStorage.getItem('eleton_plazas_param');
     if(p) params = Object.assign({}, P_DEF, JSON.parse(p));
+    const o = localStorage.getItem('eleton_plazas_obj');
+    if(o){ const arr = JSON.parse(o); if(Array.isArray(arr) && arr.length) objetivos = arr; }
     const d = localStorage.getItem('eleton_plazas_datos');
     if(d){ const arr = JSON.parse(d); if(Array.isArray(arr) && arr.length) return arr; }
   }catch(e){}
@@ -759,6 +770,38 @@ $('#btnCancelarVal').onclick = () => $('#claveValores').classList.remove('activa
 $('#claveVal').addEventListener('keydown', e => { if(e.key === 'Enter') confirmarValores(); });
 $('#claveValores').addEventListener('click', e => { if(e.target.id === 'claveValores') $('#claveValores').classList.remove('activa'); });
 
+/* ---------- conexión con la planilla ---------- */
+async function sincronizar(){
+  if(!params.url){
+    $('#periodo').textContent = 'Todavía no hay enlace de la planilla. Cargalo en “Parámetros de cálculo”, abajo de todo.';
+    document.querySelector('details.param').open = true;
+    $('#pUrl').focus();
+    return;
+  }
+  const b = $('#btnSync'); b.disabled = true; b.textContent = 'Actualizando…';
+  $('#periodo').textContent = 'Leyendo la planilla…';
+  try{
+    const sep = params.url.includes('?') ? '&' : '?';
+    const r = await fetch(params.url + sep + 'datos=1&token=' + encodeURIComponent(TOKEN_PLANILLA) + '&t=' + Date.now());
+    if(!r.ok) throw new Error('el enlace respondió ' + r.status);
+    const j = await r.json();
+    if(j.error) throw new Error(j.error);
+    if(Array.isArray(j.reservas) && j.reservas.length){
+      datos = j.reservas.map(a => ({fecha:a[0], nro:String(a[1]), adultos:a[2], ninos:a[3], noches:a[4], menorSinIva:a[5], total:a[6], saldo:a[7]}));
+    }
+    if(Array.isArray(j.objetivos) && j.objetivos.length) objetivos = j.objetivos;
+    guardar(); render();
+    $('#periodo').textContent = datos.length + ' reservas y ' + objetivos.length +
+      ' objetivos leídos de la planilla · ' + new Date().toLocaleTimeString('es-AR');
+  }catch(e){
+    $('#periodo').textContent = 'No pude leer la planilla: ' + e.message +
+      '. Revisá que la implementación tenga acceso “Cualquier persona”.';
+  }finally{
+    b.disabled = false; b.textContent = 'Actualizar desde la planilla';
+  }
+}
+$('#btnSync').onclick = sincronizar;
+
 /* ---------- copiar a la planilla ---------- */
 function copiar(){
   const vista = filtrar(datos.map(calcular));
@@ -798,7 +841,9 @@ $('#btnParam').onclick = () => {
   params.menorSinIva = parseFloat($('#pMenorSinIva').value) || P_DEF.menorSinIva;
   params.alicuota = parseFloat($('#pAlicuota').value) || P_DEF.alicuota;
   params.valorMenor = parseFloat($('#pValorMenor').value) || P_DEF.valorMenor;
+  params.url = $('#pUrl').value.trim();
   guardar(); render();
+  if(params.url) sincronizar();
   const b = $('#btnParam'); b.textContent = 'Guardado ✓'; setTimeout(()=> b.textContent = 'Guardar parámetros', 1800);
 };
 
@@ -830,10 +875,12 @@ function iniciarDatos(){
   $('#pMenorSinIva').value = params.menorSinIva;
   $('#pAlicuota').value = params.alicuota;
   $('#pValorMenor').value = params.valorMenor;
+  $('#pUrl').value = params.url || '';
   if(EN_PLANILLA){
     google.script.run.withSuccessHandler(obj => {
       if(obj && obj.length){ objetivos = obj; render(); }
     }).obtenerObjetivos();
+    $('#btnSync').classList.add('oculto');
     $('#btnCargar').textContent = 'Actualizar desde la planilla';
     $('#btnCargar').onclick = traerDePlanilla;
     $('#btnVaciar').classList.add('oculto');
@@ -846,6 +893,7 @@ function iniciarDatos(){
   datos = guardados || SEED.map(a => ({fecha:a[0], nro:a[1], adultos:a[2], ninos:a[3], noches:a[4], menorSinIva:a[5], total:a[6], saldo:a[7]}));
   render();
   if(!guardados && datos.length) $('#periodo').textContent = 'Cargado el reporte de ejemplo con ' + datos.length + ' reservas. Cargá el archivo del mes para reemplazarlo o sumar meses nuevos.';
+  if(params.url) sincronizar();
 }
 
 (function arrancar(){
