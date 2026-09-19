@@ -1,0 +1,858 @@
+<!DOCTYPE html>
+<html lang="es-AR" data-theme="light">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Conteo de plazas · Eleton Resort &amp; SPA</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,500;0,900;1,500&family=Montserrat:ital,wght@0,400;0,600;0,700;1,400&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<style>
+  :root{
+    --verde-oscuro:#0d543f;
+    --verde:#138170;
+    --verde-claro:#e6f0ec;
+    --negro:#252525;
+    --blanco:#ffffff;
+    --papel:#f6f7f5;
+    --linea:#dfe4e1;
+    --texto:#252525;
+    --texto-suave:#5d6b65;
+    --alerta:#a6301f;
+    --alerta-fondo:#fbecea;
+    --aviso:#8a6d1f;
+    box-sizing:border-box;
+    padding-top:env(safe-area-inset-top,0px);
+    padding-bottom:env(safe-area-inset-bottom,0px);
+  }
+  color-scheme: light;
+  *,*::before,*::after{box-sizing:border-box}
+  html{scroll-padding-top:env(safe-area-inset-top,0px);-webkit-text-size-adjust:100%}
+  body{
+    margin:0;background:var(--papel);color:var(--texto);
+    font-family:Montserrat,-apple-system,"Segoe UI",Roboto,Arial,sans-serif;
+    font-size:15px;line-height:1.5;
+  }
+  h1,h2,h3{font-family:"Playfair Display",Georgia,serif;font-weight:900;margin:0;letter-spacing:-.01em}
+  .wrap{max-width:1280px;margin:0 auto;padding:0 20px}
+
+  header.barra{background:var(--verde-oscuro);color:#fff;padding:22px 0 26px}
+  .marca{display:flex;align-items:baseline;gap:10px;opacity:.9}
+  .marca b{font-family:"Playfair Display",Georgia,serif;font-weight:500;font-size:19px;letter-spacing:.22em}
+  .marca span{font-size:11px;letter-spacing:.18em;opacity:.75}
+  .titulo{display:flex;flex-wrap:wrap;align-items:flex-end;justify-content:space-between;gap:16px;margin-top:14px}
+  .titulo h1{font-size:clamp(28px,4.2vw,42px);color:#fff}
+  .titulo p{margin:6px 0 0;color:#cfe3db;font-size:13.5px;max-width:58ch}
+  .acciones{display:flex;gap:10px;flex-wrap:wrap}
+  .btn{
+    font-family:inherit;font-size:13.5px;font-weight:600;cursor:pointer;
+    border-radius:2px;padding:10px 16px;border:1px solid transparent;transition:background .15s,color .15s;
+  }
+  .btn:focus-visible{outline:2px solid #fff;outline-offset:2px}
+  .btn-primario{background:#fff;color:var(--verde-oscuro)}
+  .btn-primario:hover{background:#dff0e9}
+  .btn-linea{background:transparent;color:#fff;border-color:rgba(255,255,255,.45)}
+  .btn-linea:hover{background:rgba(255,255,255,.12)}
+  .btn-chico{background:var(--blanco);color:var(--verde-oscuro);border:1px solid var(--linea);padding:8px 13px;font-size:13px}
+  .btn-chico:hover{background:var(--verde-claro)}
+  .btn-chico:focus-visible{outline:2px solid var(--verde);outline-offset:2px}
+
+  main{padding:26px 0 60px}
+  .seccion{margin-bottom:34px}
+  .seccion > h2{font-size:21px;margin-bottom:4px}
+  .seccion > .nota{color:var(--texto-suave);font-size:13px;margin:0 0 14px}
+
+  .filtros{display:flex;flex-wrap:wrap;gap:12px;align-items:center;background:var(--blanco);border:1px solid var(--linea);padding:14px;border-radius:3px;margin-bottom:26px}
+  .campo{display:flex;flex-direction:column;gap:4px}
+  .campo label{font-size:11.5px;color:var(--texto-suave);letter-spacing:.04em}
+  select,input[type=text],input[type=number]{
+    font-family:inherit;font-size:14px;color:var(--texto);background:var(--blanco);
+    border:1px solid var(--linea);border-radius:2px;padding:8px 10px;min-width:150px;
+  }
+  select:focus,input:focus{outline:2px solid var(--verde);outline-offset:1px}
+  .check{display:flex;align-items:center;gap:8px;font-size:13.5px;align-self:flex-end;padding-bottom:9px;cursor:pointer}
+  .check input{accent-color:var(--verde);width:16px;height:16px}
+  .contador{margin-left:auto;font-size:13px;color:var(--texto-suave);align-self:flex-end;padding-bottom:9px}
+
+  .kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(178px,1fr));gap:1px;background:var(--linea);border:1px solid var(--linea);border-radius:3px;overflow:hidden}
+  .kpi{background:var(--blanco);padding:16px 18px}
+  .kpi .et{font-size:11.5px;color:var(--texto-suave);letter-spacing:.05em}
+  .kpi .val{font-family:"Playfair Display",Georgia,serif;font-weight:900;font-size:30px;line-height:1.1;margin-top:6px;color:var(--verde-oscuro)}
+  .kpi .sub{font-size:12px;color:var(--texto-suave);margin-top:3px}
+  .kpi.destacado{background:var(--verde-oscuro)}
+  .kpi.destacado .et,.kpi.destacado .sub{color:#b9d5cb}
+  .kpi.destacado .val{color:#fff;font-size:34px}
+  .kpi.riesgo .val{color:var(--alerta)}
+
+  .tabla-caja{background:var(--blanco);border:1px solid var(--linea);border-radius:3px;overflow-x:auto}
+  table{border-collapse:collapse;width:100%;font-size:13.5px;min-width:900px}
+  thead th{
+    background:var(--verde-claro);color:var(--verde-oscuro);text-align:right;font-weight:700;font-size:11.5px;
+    padding:11px 10px;border-bottom:1px solid var(--linea);white-space:nowrap;position:sticky;top:0;z-index:1;
+  }
+  thead th:first-child,thead th.izq{text-align:left}
+  tbody td{padding:9px 10px;border-bottom:1px solid var(--linea);text-align:right;white-space:nowrap;font-variant-numeric:tabular-nums}
+  tbody td.izq{text-align:left}
+  tbody tr:hover{background:var(--verde-claro)}
+  tbody tr.sinpago{background:var(--alerta-fondo)}
+  tbody tr.sinpago td:first-child{box-shadow:inset 3px 0 0 var(--alerta)}
+  tbody tr.sinpago:hover{background:var(--alerta-fondo);filter:brightness(.98)}
+  tfoot td{padding:12px 10px;text-align:right;font-weight:700;background:var(--blanco);border-top:2px solid var(--verde-oscuro);white-space:nowrap;font-variant-numeric:tabular-nums}
+  tfoot td.izq{text-align:left}
+  .tag{display:inline-block;font-size:10.5px;font-weight:700;letter-spacing:.05em;color:#fff;background:var(--alerta);padding:2px 7px;border-radius:2px;margin-left:8px}
+  .mes-link{cursor:pointer;color:var(--verde);text-decoration:underline;text-underline-offset:3px;background:none;border:0;font:inherit;padding:0}
+
+  details.param{background:var(--blanco);border:1px solid var(--linea);border-radius:3px;padding:0}
+  details.param > summary{cursor:pointer;padding:14px 16px;font-weight:600;font-size:14px;list-style:none}
+  details.param > summary::-webkit-details-marker{display:none}
+  details.param > summary::before{content:"+ ";color:var(--verde);font-weight:700}
+  details.param[open] > summary::before{content:"– "}
+  .param-cuerpo{padding:0 16px 18px;display:flex;flex-wrap:wrap;gap:18px;align-items:flex-end}
+  .param-cuerpo .ayuda{flex:1 1 260px;font-size:12.5px;color:var(--texto-suave);min-width:220px}
+
+  .vacio{background:var(--blanco);border:1px dashed var(--linea);border-radius:3px;padding:44px 24px;text-align:center;color:var(--texto-suave)}
+  .vacio h3{font-size:19px;color:var(--texto);margin-bottom:8px}
+
+  #zona{position:fixed;inset:0;background:rgba(13,84,63,.92);color:#fff;display:none;align-items:center;justify-content:center;z-index:50;font-family:"Playfair Display",Georgia,serif;font-size:26px;text-align:center;padding:30px}
+  #zona.activa{display:flex}
+  .aviso{background:var(--blanco);border-left:3px solid var(--aviso);padding:12px 14px;font-size:13px;color:var(--texto-suave);border-radius:2px;margin-top:14px}
+  footer{border-top:1px solid var(--linea);padding:18px 0 34px;font-size:12.5px;color:var(--texto-suave)}
+  .oculto{display:none !important}
+  body.bloqueado{overflow:hidden}
+  /* pantalla de acceso */
+  #acceso{position:fixed;inset:0;z-index:90;background:var(--papel);display:flex;align-items:center;justify-content:center;padding:24px}
+  #acceso .caja{background:var(--blanco);border:1px solid var(--linea);border-top:4px solid var(--verde-oscuro);border-radius:3px;padding:30px 30px 26px;max-width:410px;width:100%;box-shadow:0 14px 44px rgba(13,84,63,.10)}
+  #acceso .marca{opacity:1;color:var(--verde-oscuro);margin-bottom:18px}
+  #acceso h2{font-size:24px;color:var(--verde-oscuro)}
+  #acceso p{font-size:13px;color:var(--texto-suave);margin:8px 0 20px}
+  #acceso .campo{width:100%}
+  #acceso input{width:100%;min-width:0;padding:11px 12px;font-size:15px}
+  #acceso .btn{width:100%;margin-top:14px;background:var(--verde-oscuro);color:#fff;padding:12px}
+  #acceso .btn:hover{background:var(--verde)}
+  .error{color:var(--alerta);font-size:12.5px;margin-top:10px;min-height:18px}
+
+  /* valores reservados */
+  .kpi.reservado .val{letter-spacing:.14em;color:var(--texto-suave)}
+  .ojo{background:none;border:0;cursor:pointer;color:var(--verde);font-size:12px;font-weight:600;font-family:inherit;padding:2px 0;margin-top:4px;text-decoration:underline;text-underline-offset:3px}
+  .ojo:focus-visible{outline:2px solid var(--verde);outline-offset:2px}
+  .puntos{color:var(--texto-suave);letter-spacing:.12em}
+  #claveValores{position:fixed;inset:0;z-index:92;background:rgba(37,37,37,.45);display:none;align-items:center;justify-content:center;padding:24px}
+  #claveValores.activa{display:flex}
+  #claveValores .caja{background:var(--blanco);border-radius:3px;border-top:4px solid var(--verde);padding:26px;max-width:380px;width:100%}
+  #claveValores h3{font-size:20px;color:var(--verde-oscuro)}
+  #claveValores p{font-size:13px;color:var(--texto-suave);margin:8px 0 16px}
+  #claveValores input{width:100%;padding:11px 12px}
+  .fila-botones{display:flex;gap:10px;margin-top:14px}
+  .fila-botones .btn{flex:1}
+
+  /* objetivos */
+  .objetivos{display:grid;grid-template-columns:repeat(auto-fit,minmax(290px,1fr));gap:16px}
+  .obj{background:var(--blanco);border:1px solid var(--linea);border-left:4px solid var(--linea);border-radius:3px;padding:18px}
+  .obj.cumplido{border-left-color:var(--verde);background:linear-gradient(180deg,#f2f9f6,var(--blanco) 60%)}
+  .obj h3{font-size:19px;color:var(--verde-oscuro);display:flex;align-items:center;gap:8px;text-transform:capitalize}
+  .obj .estado{font-size:11px;font-weight:700;letter-spacing:.04em;font-family:Montserrat,sans-serif;background:var(--verde);color:#fff;padding:3px 8px;border-radius:2px}
+  .obj .estado.pendiente{background:var(--verde-claro);color:var(--verde-oscuro)}
+  .metrica{margin-top:14px}
+  .metrica .top{display:flex;justify-content:space-between;align-items:baseline;gap:10px;font-size:12.5px;color:var(--texto-suave)}
+  .metrica .top b{font-size:15px;color:var(--texto);font-variant-numeric:tabular-nums}
+  .pista{height:6px;background:var(--verde-claro);border-radius:3px;margin-top:6px;overflow:hidden}
+  .pista i{display:block;height:100%;background:var(--verde);border-radius:3px}
+  .pista i.full{background:var(--verde-oscuro)}
+  .obj .pie{margin-top:14px;font-size:12px;color:var(--texto-suave)}
+
+  /* festejo */
+  #fuegos{position:fixed;inset:0;z-index:80;pointer-events:none;display:none}
+  #fuegos.activo{display:block}
+  #festejo{position:fixed;left:50%;transform:translateX(-50%);top:calc(16px + env(safe-area-inset-top,0px));z-index:81;background:var(--verde-oscuro);color:#fff;border-radius:3px;padding:14px 18px;max-width:min(92vw,460px);display:none;box-shadow:0 10px 30px rgba(13,84,63,.3)}
+  #festejo.activo{display:block}
+  #festejo strong{font-family:"Playfair Display",Georgia,serif;font-size:19px;display:block}
+  #festejo span{font-size:13px;color:#cfe3db}
+  #festejo button{background:none;border:0;color:#fff;cursor:pointer;font:inherit;font-size:12px;text-decoration:underline;padding:6px 0 0}
+
+  @media (max-width:640px){
+    .wrap{padding:0 14px}
+    .kpi .val{font-size:26px}
+    .contador{margin-left:0;width:100%;padding-bottom:0}
+  }
+  @media (prefers-reduced-motion: reduce){*{transition:none !important;animation:none !important}}
+</style>
+</head>
+<body class="bloqueado">
+<div id="acceso">
+  <div class="caja">
+    <div class="marca"><b>ELETON</b><span>RESORT &amp; SPA</span></div>
+    <h2>Conteo de plazas</h2>
+    <p>Información interna de reservas. Ingresá la clave del equipo para entrar.</p>
+    <div class="campo">
+      <label for="claveAcceso">Clave de acceso</label>
+      <input type="password" id="claveAcceso" autocomplete="current-password">
+    </div>
+    <button class="btn" id="btnEntrar">Entrar</button>
+    <div class="error" id="errorAcceso"></div>
+  </div>
+</div>
+
+<div id="claveValores" role="dialog" aria-modal="true">
+  <div class="caja">
+    <h3>Valores reservados</h3>
+    <p>Valor Adultos y Valor Menor requieren autorización. Ingresá la clave de valores.</p>
+    <div class="campo"><label for="claveVal">Clave de valores</label><input type="password" id="claveVal" autocomplete="off"></div>
+    <div class="error" id="errorVal"></div>
+    <div class="fila-botones">
+      <button class="btn btn-chico" id="btnCancelarVal">Cancelar</button>
+      <button class="btn btn-primario" id="btnVerVal" style="background:var(--verde-oscuro);color:#fff">Mostrar valores</button>
+    </div>
+  </div>
+</div>
+
+<canvas id="fuegos"></canvas>
+<div id="festejo" role="status">
+  <strong id="festejoTitulo"></strong>
+  <span id="festejoTexto"></span>
+  <button id="festejoCerrar">Cerrar</button>
+</div>
+
+<div id="zona">Soltá acá el reporte de Cloudbeds</div>
+
+<header class="barra">
+  <div class="wrap">
+    <div class="marca"><b>ELETON</b><span>RESORT &amp; SPA</span></div>
+    <div class="titulo">
+      <div>
+        <h1>Conteo de plazas</h1>
+        <p id="periodo">Adultos y menores por noche, valores por plaza y reservas sin pago, a partir del reporte de Cloudbeds.</p>
+      </div>
+      <div class="acciones">
+        <button class="btn btn-primario" id="btnCargar">Cargar reporte del mes</button>
+        <button class="btn btn-linea" id="btnCopiar">Copiar para la planilla</button>
+        <button class="btn btn-linea" id="btnVaciar">Vaciar datos</button>
+      </div>
+    </div>
+    <input type="file" id="archivo" accept=".xlsx,.xls,.csv" class="oculto">
+  </div>
+</header>
+
+<main class="wrap">
+  <div class="filtros" id="filtros">
+    <div class="campo">
+      <label for="fMes">Mes</label>
+      <select id="fMes"><option value="">Todos los meses</option></select>
+    </div>
+    <div class="campo">
+      <label for="fBuscar">Número de reserva</label>
+      <input type="text" id="fBuscar" placeholder="Buscar…">
+    </div>
+    <label class="check"><input type="checkbox" id="fSinPago"> Solo reservas sin pago</label>
+    <div class="contador" id="contador"></div>
+  </div>
+
+  <section class="seccion" id="bloqueKpis">
+    <div class="kpis">
+      <div class="kpi destacado"><div class="et">Total de plazas</div><div class="val" id="kTotal">—</div><div class="sub" id="kReservas">—</div></div>
+      <div class="kpi"><div class="et">Plazas adultos</div><div class="val" id="kAdultos">—</div><div class="sub" id="kAdultosDet">—</div></div>
+      <div class="kpi"><div class="et">Plazas menores</div><div class="val" id="kNinos">—</div><div class="sub" id="kNinosDet">—</div></div>
+      <div class="kpi" id="kpiValAd"><div class="et">Valor Adultos</div><div class="val" id="kValAd">••••••</div><button class="ojo" data-ver="1">Mostrar valor</button></div>
+      <div class="kpi" id="kpiValMe"><div class="et">Valor Menor</div><div class="val" id="kValMe">••••••</div><button class="ojo" data-ver="1">Mostrar valor</button></div>
+      <div class="kpi riesgo"><div class="et">Reservas sin pago</div><div class="val" id="kSinPago">—</div><div class="sub" id="kSinPagoDet">—</div></div>
+    </div>
+    <div class="aviso oculto" id="avisoSaldo"></div>
+  </section>
+
+  <section class="seccion" id="bloqueObjetivos">
+    <h2>Objetivos de venta</h2>
+    <p class="nota">Se comparan contra las reservas cargadas, por mes de la fecha de reserva. Los objetivos se cargan en la hoja “Objetivos” de la planilla.</p>
+    <div class="objetivos" id="listaObjetivos"></div>
+  </section>
+
+  <section class="seccion" id="bloqueMeses">
+    <h2>Resumen por mes</h2>
+    <p class="nota">Cada mes se suma al conteo general. Tocá un mes para filtrar el detalle.</p>
+    <div class="tabla-caja">
+      <table id="tablaMeses">
+        <thead><tr>
+          <th class="izq">Mes</th><th>Reservas</th><th>Plazas adultos</th><th>Plazas menores</th>
+          <th>Total plazas</th><th>Valor Adultos</th><th>Valor Menor</th><th>Total habitaciones</th><th>Sin pago</th>
+        </tr></thead>
+        <tbody></tbody>
+        <tfoot></tfoot>
+      </table>
+    </div>
+  </section>
+
+  <section class="seccion" id="bloqueDetalle">
+    <h2>Detalle de reservas</h2>
+    <p class="nota">Las filas marcadas tienen el saldo pendiente igual al total de la habitación: no abonaron nada.</p>
+    <div class="tabla-caja">
+      <table id="tablaDetalle">
+        <thead><tr>
+          <th class="izq">Fecha</th><th class="izq">Reserva</th><th>Ad.</th><th>Men.</th><th>Noches</th>
+          <th>Adultos Total</th><th>Niños Total</th><th>Valor Ad. sin IVA</th><th>Valor Adultos</th>
+          <th>Valor Menor sin IVA</th><th>Valor Menor</th><th>Total habitación</th><th>Saldo pendiente</th>
+        </tr></thead>
+        <tbody></tbody>
+        <tfoot></tfoot>
+      </table>
+    </div>
+  </section>
+
+  <section class="seccion" id="bloqueVacio" style="display:none">
+    <div class="vacio">
+      <h3>Todavía no hay reservas cargadas</h3>
+      <p>Cargá el reporte de reservas de Cloudbeds (.xlsx o .csv) para ver el conteo del mes.</p>
+      <button class="btn btn-chico" id="btnCargar2">Cargar reporte</button>
+    </div>
+  </section>
+
+  <section class="seccion">
+    <details class="param">
+      <summary>Parámetros de cálculo</summary>
+      <div class="param-cuerpo">
+        <div class="campo">
+          <label for="pMenorSinIva">Valor Menor sin IVA (por plaza)</label>
+          <input type="number" id="pMenorSinIva" step="100">
+        </div>
+        <div class="campo">
+          <label for="pAlicuota">Coeficiente Valor Adultos</label>
+          <input type="number" id="pAlicuota" step="0.0001">
+        </div>
+        <div class="campo">
+          <label for="pValorMenor">Valor Menor por plaza</label>
+          <input type="number" id="pValorMenor" step="5">
+        </div>
+        <button class="btn btn-chico" id="btnParam">Guardar parámetros</button>
+        <p class="ayuda">Si el reporte trae la columna “Valor Menor sin IVA”, se usa ese valor por reserva; el parámetro cubre las filas que vengan vacías. El resto de las fórmulas son las del cálculo del hotel.</p>
+      </div>
+    </details>
+  </section>
+
+  <footer>
+    Uso interno · Eleton Resort &amp; SPA. Los datos cargados quedan guardados en este dispositivo hasta que los vacíes.
+  </footer>
+</main>
+
+<script>
+const SEED = [["24/06/2026","4112173789775",3,0,11,100000.0,6270000.0,0.0],["29/06/2026","2845821737030",8,3,4,100000.0,6878000.0,0.0],["29/06/2026","2627176549623",8,4,4,100000.0,7144000.0,0.0],["29/06/2026","9366843358126",9,3,4,100000.0,7277000.0,0.0],["29/06/2026","4253619296345",14,0,4,100000.0,10184000.0,91960.0],["30/06/2026","9760646237969",5,0,3,100000.0,2692200.0,0.0],["30/06/2026","5757763550960",4,0,3,100000.0,2160000.0,282920.0],["30/06/2026","1620705999300",2,0,3,100000.0,1200000.0,0.0],["05/07/2026","1457911476939",6,1,5,100000.0,5248749.63,0.0],["21/07/2026","5865865308420",2,1,3,100000.0,1560000.0,0.0],["26/07/2026","8979468651759",2,2,3,100000.0,2112000.0,0.0],["30/07/2026","7191520842982",2,0,3,100000.0,1428000.0,0.0],["06/08/2026","1448500240196",2,0,4,100000.0,2196462.8,0.0],["07/08/2026","7600722666476",2,2,4,100000.0,2824000.0,0.0],["11/08/2026","9574981830868",12,4,5,100000.0,12088450.0,-76500.0],["20/08/2026","4793058727543",4,0,6,100000.0,4800000.0,0.0],["21/08/2026","8847076676362",2,1,4,100000.0,3160000.0,0.0],["23/08/2026","4501876641102",2,2,4,100000.0,2824000.0,0.0],["24/08/2026","2884021020194",3,1,7,100000.0,4830000.0,0.0],["24/08/2026","2783962579756",4,0,3,100000.0,2220000.0,0.0],["24/08/2026","2134414770143",6,3,3,100000.0,4503840.0,0.0],["24/08/2026","5199367671764",2,0,3,100000.0,1428000.0,0.0],["24/08/2026","4276671602361",3,1,4,100000.0,3024000.0,0.0],["24/08/2026","3299630979020",10,0,3,100000.0,5700000.0,3965775.0],["24/08/2026","3861556846224",2,2,3,100000.0,1980000.0,0.0],["25/08/2026","8874053631326",4,0,3,100000.0,2720000.0,0.0],["25/08/2026","2919075959369",2,2,3,100000.0,1920000.0,0.0],["26/08/2026","2799167310464",4,0,3,100000.0,1817070.0,0.0],["26/08/2026","9290515999869",6,1,5,100000.0,6500000.0,1169163.0],["26/08/2026","3978962983300",3,1,10,100000.0,5791640.0,0.0],["27/08/2026","9975103793416",3,2,3,100000.0,2760000.0,1016400.0],["27/08/2026","5271706343285",2,0,5,100000.0,2100000.0,0.0],["27/08/2026","3849214527875",1,0,5,100000.0,2000000.0,1210000.0],["28/08/2026","3463178564461",2,0,3,100000.0,1260000.0,0.0],["28/08/2026","1367741949951",2,0,3,100000.0,1344000.0,0.0],["28/08/2026","6705039651359",2,0,7,100000.0,2940000.0,0.0],["29/08/2026","8874066587222",9,3,4,100000.0,8079700.0,0.0],["29/08/2026","6253290997774",2,0,5,100000.0,2100000.0,0.0],["29/08/2026","6725814445277",6,0,3,100000.0,3093930.0,0.0],["30/08/2026","9964566005962",14,3,3,100000.0,11556000.0,0.0],["30/08/2026","2248259050371",3,0,3,100000.0,1770000.0,0.0],["30/08/2026","3429759608727",2,0,3,100000.0,1320000.0,0.0],["30/08/2026","6552163927578",2,0,3,100000.0,1031310.0,0.0],["31/08/2026","3845069496788",2,0,9,100000.0,3241635.0,0.0],["31/08/2026","6067048264148",3,0,4,100000.0,2532000.0,0.0],["31/08/2026","9206997531153",4,0,4,100000.0,4048000.0,0.0],["31/08/2026","2940666038815",10,4,3,100000.0,7620000.0,0.0],["01/09/2026","4860979439321",12,2,4,100000.0,11360000.0,0.0],["01/09/2026","2797892076291",3,0,3,100000.0,1770000.0,0.0],["03/09/2026","4276759618197",5,1,3,100000.0,3431509.0,0.0],["03/09/2026","8125534570857",3,0,6,100000.0,3716000.0,0.0],["04/09/2026","8635800062077",5,0,4,100000.0,5040000.0,0.0],["05/09/2026","2690958484009",3,0,3,100000.0,2062620.0,0.0],["06/09/2026","8825347534897",11,2,4,100000.0,8826704.0,0.0],["07/09/2026","5525416952383",5,2,4,100000.0,5140000.0,4932920.0],["08/09/2026","1716503369224",8,5,3,100000.0,7836000.0,0.0],["09/09/2026","7448522941430",8,1,3,100000.0,4223460.0,0.0],["11/09/2026","5202126728107",2,0,8,100000.0,3440000.0,0.0],["11/09/2026","6233421772250",3,0,5,100000.0,2538987.0,0.0],["12/09/2026","1418929494690",7,2,3,100000.0,5520000.0,0.0],["12/09/2026","9920075087688",2,0,3,100000.0,1710000.0,2069100.0],["13/09/2026","8010352668218",3,1,4,100000.0,2920000.0,0.0],["16/09/2026","3330268390435",2,0,7,100000.0,2520000.0,0.0],["17/09/2026","8351570746133",14,4,4,100000.0,13040000.0,15778400.0],["17/09/2026","2762702679857",4,0,4,100000.0,3760000.0,4549600.0],["18/09/2026","4424500957090",6,2,7,100000.0,10220000.0,12366200.0],["18/09/2026","9964711025680",11,5,3,100000.0,9738000.0,11782980.0],["18/09/2026","5303600222803",5,0,5,100000.0,5150000.0,6231500.0]];
+
+const P_DEF = { menorSinIva: 100000, alicuota: 0.0063, valorMenor: 715 };
+let params = Object.assign({}, P_DEF);
+let datos = [];
+
+/* Claves (SHA-256). Para cambiarlas: abrí la consola del navegador y ejecutá
+   await hashClave('la-nueva-clave'), y pegá el resultado acá.
+   Clave de acceso actual: eleton2026 · Clave de valores actual: valores2026 */
+const CLAVE_ACCESO = '1606fcb165b10927841aac15746b8faf01ef9b4862c7ab95daf682b752d20e4d';
+const CLAVE_VALORES = '3a5acbaf14f03bb4349874a0d9ae6077942c3e5cfdce3ddadf701acabc56caff';
+let valoresVisibles = false;
+
+/* Objetivos de venta por mes. En la planilla se cargan en la hoja "Objetivos". */
+let objetivos = [
+  { mes: '2026-10', reservas: 68,  ticket: 2483503, total: 168878218 },
+  { mes: '2026-11', reservas: 119, ticket: 2539844, total: 302241457 },
+  { mes: '2026-12', reservas: 196, ticket: 2412583, total: 472866368 }
+];
+const festejados = new Set();
+
+const MESES = ['enero','febrero','marzo','abril','mayo','junio','julio','agosto','septiembre','octubre','noviembre','diciembre'];
+const nfMoneda = new Intl.NumberFormat('es-AR',{minimumFractionDigits:2,maximumFractionDigits:2});
+const nfEntero = new Intl.NumberFormat('es-AR');
+const money = n => '$ ' + nfMoneda.format(n || 0);
+const oculto = '<span class="puntos">••••••</span>';
+const mv = n => valoresVisibles ? money(n) : oculto;   // valores con autorización
+const ent = n => nfEntero.format(Math.round(n || 0));
+const $ = s => document.querySelector(s);
+
+/* ---------- almacenamiento local ---------- */
+function guardar(){
+  try{
+    localStorage.setItem('eleton_plazas_datos', JSON.stringify(datos));
+    localStorage.setItem('eleton_plazas_param', JSON.stringify(params));
+  }catch(e){}
+}
+function recuperar(){
+  try{
+    const p = localStorage.getItem('eleton_plazas_param');
+    if(p) params = Object.assign({}, P_DEF, JSON.parse(p));
+    const d = localStorage.getItem('eleton_plazas_datos');
+    if(d){ const arr = JSON.parse(d); if(Array.isArray(arr) && arr.length) return arr; }
+  }catch(e){}
+  return null;
+}
+
+/* ---------- fechas ---------- */
+function parseFecha(v){
+  if(v instanceof Date && !isNaN(v)) return {d:v.getDate(), m:v.getMonth()+1, a:v.getFullYear()};
+  const s = String(v || '').trim();
+  let m = s.match(/^(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{4})/);
+  if(m) return {d:+m[1], m:+m[2], a:+m[3]};
+  m = s.match(/^(\d{4})[\/\-](\d{1,2})[\/\-](\d{1,2})/);
+  if(m) return {d:+m[3], m:+m[2], a:+m[1]};
+  return null;
+}
+const claveMes = f => f ? f.a + '-' + String(f.m).padStart(2,'0') : 'sin-fecha';
+const cap = s => s.charAt(0).toUpperCase() + s.slice(1);
+const nombreMes = k => k === 'sin-fecha' ? 'Sin fecha' : MESES[+k.slice(5)-1] + ' ' + k.slice(0,4);
+const fechaTexto = f => f ? String(f.d).padStart(2,'0') + '/' + String(f.m).padStart(2,'0') + '/' + f.a : '—';
+
+/* ---------- cálculo ---------- */
+function calcular(r){
+  const adultosTotal = r.adultos * r.noches;
+  const ninosTotal = r.ninos * r.noches;
+  const menorSinIva = r.menorSinIva > 0 ? r.menorSinIva : params.menorSinIva;
+  const valorAdSinIva = adultosTotal > 0 ? (r.total - menorSinIva * ninosTotal) / adultosTotal : 0;
+  const valorAdultos = valorAdSinIva * params.alicuota * adultosTotal;
+  const valorMenor = params.valorMenor * ninosTotal;
+  const sinPago = r.total > 0 && r.saldo >= r.total - 1;
+  return Object.assign({}, r, {adultosTotal, ninosTotal, menorSinIva, valorAdSinIva, valorAdultos, valorMenor, sinPago});
+}
+
+/* ---------- lectura del reporte ---------- */
+const norm = s => String(s||'').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'').replace(/\s+/g,' ').trim();
+function buscarCol(cabeceras, alternativas){
+  for(const alt of alternativas){
+    const i = cabeceras.findIndex(h => h === alt);
+    if(i >= 0) return i;
+  }
+  for(const alt of alternativas){
+    const i = cabeceras.findIndex(h => h.includes(alt));
+    if(i >= 0) return i;
+  }
+  return -1;
+}
+const num = v => {
+  if(typeof v === 'number') return v;
+  const s = String(v||'').replace(/[^0-9,.\-]/g,'');
+  if(!s) return 0;
+  const n = parseFloat(s.includes(',') && s.lastIndexOf(',') > s.lastIndexOf('.') ? s.replace(/\./g,'').replace(',','.') : s.replace(/,/g,''));
+  return isNaN(n) ? 0 : n;
+};
+
+function importar(filas){
+  if(!filas.length) throw new Error('El archivo está vacío.');
+  let iCab = 0;
+  for(let i=0;i<Math.min(filas.length,10);i++){
+    if(filas[i].some(c => norm(c).includes('reserva'))){ iCab = i; break; }
+  }
+  const cab = filas[iCab].map(norm);
+  const c = {
+    fecha: buscarCol(cab,['fecha de la reserva','fecha']),
+    nro: buscarCol(cab,['numero de la reserva','n de la reserva','reserva']),
+    adultos: buscarCol(cab,['adultos']),
+    ninos: buscarCol(cab,['ninos','menores']),
+    noches: buscarCol(cab,['noches']),
+    menorSinIva: buscarCol(cab,['valor menor sin iva']),
+    total: buscarCol(cab,['total de la habitacion','total habitacion']),
+    saldo: buscarCol(cab,['saldo pendiente','saldo'])
+  };
+  if(c.nro < 0 || c.adultos < 0 || c.noches < 0 || c.total < 0)
+    throw new Error('No encontré las columnas del reporte (Número de la reserva, Adultos, Noches, Total de la habitación).');
+
+  const nuevas = [];
+  for(let i=iCab+1;i<filas.length;i++){
+    const f = filas[i];
+    if(!f || !String(f[c.nro]||'').trim()) continue;
+    const noches = Math.round(num(f[c.noches]));
+    if(!noches) continue;
+    nuevas.push({
+      fecha: fechaTexto(parseFecha(f[c.fecha])),
+      nro: String(f[c.nro]).trim(),
+      adultos: Math.round(num(f[c.adultos])),
+      ninos: c.ninos >= 0 ? Math.round(num(f[c.ninos])) : 0,
+      noches: noches,
+      menorSinIva: c.menorSinIva >= 0 ? num(f[c.menorSinIva]) : 0,
+      total: num(f[c.total]),
+      saldo: c.saldo >= 0 ? num(f[c.saldo]) : 0
+    });
+  }
+  if(!nuevas.length) throw new Error('No encontré reservas en el archivo.');
+
+  const porNro = new Map(datos.map(r => [r.nro, r]));
+  let agregadas = 0, actualizadas = 0;
+  nuevas.forEach(r => { porNro.has(r.nro) ? actualizadas++ : agregadas++; porNro.set(r.nro, r); });
+  datos = [...porNro.values()];
+  guardar();
+  render();
+  const meses = [...new Set(nuevas.map(r => claveMes(parseFecha(r.fecha))))].sort();
+  $('#periodo').textContent = agregadas + ' reservas nuevas' + (actualizadas ? ' y ' + actualizadas + ' actualizadas' : '') +
+    ' · ' + meses.map(nombreMes).join(', ');
+}
+
+function leerArchivo(file){
+  const fr = new FileReader();
+  fr.onload = e => {
+    try{
+      const wb = XLSX.read(e.target.result, {type:'array', cellDates:true});
+      const hoja = wb.Sheets[wb.SheetNames[0]];
+      importar(XLSX.utils.sheet_to_json(hoja, {header:1, raw:true, defval:''}));
+    }catch(err){
+      $('#periodo').textContent = 'No pude leer el archivo: ' + err.message;
+    }
+  };
+  fr.onerror = () => { $('#periodo').textContent = 'No pude leer el archivo.'; };
+  fr.readAsArrayBuffer(file);
+}
+
+/* ---------- render ---------- */
+function filtrar(lista){
+  const mes = $('#fMes').value, txt = $('#fBuscar').value.trim().toLowerCase(), solo = $('#fSinPago').checked;
+  return lista.filter(r =>
+    (!mes || claveMes(parseFecha(r.fecha)) === mes) &&
+    (!txt || r.nro.toLowerCase().includes(txt)) &&
+    (!solo || r.sinPago));
+}
+function totales(lista){
+  return lista.reduce((t,r)=>({
+    reservas:t.reservas+1, adultosTotal:t.adultosTotal+r.adultosTotal, ninosTotal:t.ninosTotal+r.ninosTotal,
+    valorAdultos:t.valorAdultos+r.valorAdultos, valorMenor:t.valorMenor+r.valorMenor,
+    total:t.total+r.total, saldo:t.saldo+r.saldo, sinPago:t.sinPago+(r.sinPago?1:0),
+    saldoSinPago:t.saldoSinPago+(r.sinPago?r.saldo:0)
+  }),{reservas:0,adultosTotal:0,ninosTotal:0,valorAdultos:0,valorMenor:0,total:0,saldo:0,sinPago:0,saldoSinPago:0});
+}
+
+function render(){
+  const calc = datos.map(calcular);
+  const vacio = calc.length === 0;
+  ['#bloqueKpis','#bloqueMeses','#bloqueDetalle','#filtros'].forEach(s => $(s).style.display = vacio ? 'none' : '');
+  $('#bloqueVacio').style.display = vacio ? '' : 'none';
+  if(vacio){ renderObjetivos([]); return; }
+
+  // selector de meses
+  const meses = [...new Set(calc.map(r => claveMes(parseFecha(r.fecha))))].sort();
+  const sel = $('#fMes'), actual = sel.value;
+  sel.innerHTML = '<option value="">Todos los meses</option>' + meses.map(m => `<option value="${m}">${nombreMes(m)}</option>`).join('');
+  sel.value = meses.includes(actual) ? actual : '';
+
+  const vista = filtrar(calc), t = totales(vista);
+
+  $('#kTotal').textContent = ent(t.adultosTotal + t.ninosTotal);
+  $('#kReservas').textContent = t.reservas + (t.reservas === 1 ? ' reserva' : ' reservas');
+  $('#kAdultos').textContent = ent(t.adultosTotal);
+  $('#kAdultosDet').textContent = 'adultos × noches';
+  $('#kNinos').textContent = ent(t.ninosTotal);
+  $('#kNinosDet').textContent = 'menores × noches';
+  $('#kValAd').innerHTML = valoresVisibles ? money(t.valorAdultos) : '••••••';
+  $('#kValMe').innerHTML = valoresVisibles ? money(t.valorMenor) : '••••••';
+  $('#kpiValAd').classList.toggle('reservado', !valoresVisibles);
+  $('#kpiValMe').classList.toggle('reservado', !valoresVisibles);
+  document.querySelectorAll('.ojo').forEach(b => b.textContent = valoresVisibles ? 'Ocultar valor' : 'Mostrar valor');
+  $('#kSinPago').textContent = ent(t.sinPago);
+  $('#kSinPagoDet').textContent = t.sinPago ? money(t.saldoSinPago) + ' a reclamar' : 'Todas registran algún pago';
+  $('#contador').textContent = vista.length + ' de ' + calc.length + ' reservas · saldo pendiente total ' + money(t.saldo);
+
+  const raros = vista.filter(r => r.saldo > r.total + 1).length;
+  const av = $('#avisoSaldo');
+  av.classList.toggle('oculto', raros === 0);
+  if(raros) av.textContent = raros + (raros === 1 ? ' reserva tiene' : ' reservas tienen') +
+    ' un saldo pendiente mayor al total de la habitación (el saldo incluye consumos o extras fuera del alojamiento). Quedan marcadas como sin pago.';
+
+  // resumen por mes (respeta buscador y filtro de sin pago, no el mes elegido)
+  const baseMes = calc.filter(r => (!$('#fBuscar').value.trim() || r.nro.toLowerCase().includes($('#fBuscar').value.trim().toLowerCase())) && (!$('#fSinPago').checked || r.sinPago));
+  const porMes = new Map();
+  baseMes.forEach(r => {
+    const k = claveMes(parseFecha(r.fecha));
+    if(!porMes.has(k)) porMes.set(k, []);
+    porMes.get(k).push(r);
+  });
+  $('#tablaMeses tbody').innerHTML = [...porMes.keys()].sort().map(k => {
+    const m = totales(porMes.get(k));
+    return `<tr><td class="izq"><button class="mes-link" data-mes="${k}">${nombreMes(k)}</button></td>
+      <td>${ent(m.reservas)}</td><td>${ent(m.adultosTotal)}</td><td>${ent(m.ninosTotal)}</td>
+      <td><strong>${ent(m.adultosTotal + m.ninosTotal)}</strong></td>
+      <td>${mv(m.valorAdultos)}</td><td>${mv(m.valorMenor)}</td><td>${money(m.total)}</td>
+      <td>${m.sinPago ? '<span class="tag">' + m.sinPago + '</span>' : '—'}</td></tr>`;
+  }).join('');
+  const tg = totales(baseMes);
+  $('#tablaMeses tfoot').innerHTML = `<tr><td class="izq">Conteo general</td><td>${ent(tg.reservas)}</td>
+    <td>${ent(tg.adultosTotal)}</td><td>${ent(tg.ninosTotal)}</td><td>${ent(tg.adultosTotal + tg.ninosTotal)}</td>
+    <td>${mv(tg.valorAdultos)}</td><td>${mv(tg.valorMenor)}</td><td>${money(tg.total)}</td><td>${ent(tg.sinPago)}</td></tr>`;
+
+  // detalle
+  const orden = vista.slice().sort((a,b) => {
+    const fa = parseFecha(a.fecha), fb = parseFecha(b.fecha);
+    return (fa ? fa.a*10000+fa.m*100+fa.d : 0) - (fb ? fb.a*10000+fb.m*100+fb.d : 0);
+  });
+  $('#tablaDetalle tbody').innerHTML = orden.map(r => `<tr class="${r.sinPago ? 'sinpago' : ''}">
+    <td class="izq">${r.fecha}</td>
+    <td class="izq">${r.nro}${r.sinPago ? '<span class="tag">SIN PAGO</span>' : ''}</td>
+    <td>${r.adultos}</td><td>${r.ninos}</td><td>${r.noches}</td>
+    <td><strong>${ent(r.adultosTotal)}</strong></td><td><strong>${ent(r.ninosTotal)}</strong></td>
+    <td>${money(r.valorAdSinIva)}</td><td>${mv(r.valorAdultos)}</td>
+    <td>${money(r.menorSinIva)}</td><td>${mv(r.valorMenor)}</td>
+    <td>${money(r.total)}</td><td>${money(r.saldo)}</td></tr>`).join('');
+  $('#tablaDetalle tfoot').innerHTML = `<tr><td class="izq" colspan="5">Totales${$('#fMes').value ? ' · ' + nombreMes($('#fMes').value) : ''}</td>
+    <td>${ent(t.adultosTotal)}</td><td>${ent(t.ninosTotal)}</td><td>—</td><td>${mv(t.valorAdultos)}</td>
+    <td>—</td><td>${mv(t.valorMenor)}</td><td>${money(t.total)}</td><td>${money(t.saldo)}</td></tr>`;
+
+  document.querySelectorAll('.mes-link').forEach(b => b.onclick = () => { $('#fMes').value = b.dataset.mes; render(); });
+
+  renderObjetivos(calc);
+}
+
+/* ---------- objetivos de venta ---------- */
+function renderObjetivos(calc){
+  const cont = $('#listaObjetivos');
+  if(!objetivos.length){ cont.innerHTML = '<p class="nota">Todavía no hay objetivos cargados.</p>'; return; }
+
+  const real = new Map();
+  calc.forEach(r => {
+    const k = claveMes(parseFecha(r.fecha));
+    if(!real.has(k)) real.set(k, {reservas:0, total:0});
+    const m = real.get(k);
+    m.reservas++; m.total += r.total;
+  });
+
+  const logros = [];
+  cont.innerHTML = objetivos.slice().sort((a,b)=> a.mes.localeCompare(b.mes)).map(o => {
+    const r = real.get(o.mes) || {reservas:0, total:0};
+    const ticket = r.reservas ? r.total / r.reservas : 0;
+    const metricas = [
+      {id:'reservas', et:'Reservas vendidas', val:r.reservas, obj:o.reservas, fmt:ent},
+      {id:'ticket', et:'Ticket promedio', val:ticket, obj:o.ticket, fmt:money},
+      {id:'total', et:'Total vendido', val:r.total, obj:o.total, fmt:money}
+    ];
+    const cumplidas = metricas.filter(m => m.obj > 0 && m.val >= m.obj);
+    const completo = cumplidas.length === metricas.filter(m => m.obj > 0).length && cumplidas.length > 0;
+    cumplidas.forEach(m => logros.push({clave:o.mes+':'+m.id, mes:o.mes, et:m.et, completo:false}));
+    if(completo) logros.push({clave:o.mes+':mes', mes:o.mes, et:'los tres objetivos', completo:true});
+
+    return `<article class="obj ${completo ? 'cumplido' : ''}" data-mes="${o.mes}">
+      <h3>${nombreMes(o.mes)} ${completo ? '<span class="estado">Objetivo cumplido</span>' : '<span class="estado pendiente">' + cumplidas.length + ' de ' + metricas.filter(m=>m.obj>0).length + '</span>'}</h3>
+      ${metricas.map(m => {
+        const pct = m.obj > 0 ? Math.min(100, (m.val / m.obj) * 100) : 0;
+        return `<div class="metrica">
+          <div class="top"><span>${m.et}</span><span><b>${m.fmt(m.val)}</b> de ${m.fmt(m.obj)}</span></div>
+          <div class="pista"><i class="${pct >= 100 ? 'full' : ''}" style="width:${pct.toFixed(1)}%"></i></div>
+        </div>`;
+      }).join('')}
+      <p class="pie">${completo
+        ? 'Superaron el objetivo del mes. Tocá la tarjeta para repetir el festejo.'
+        : (r.reservas ? 'Faltan ' + Math.max(0, o.reservas - r.reservas) + ' reservas y ' + money(Math.max(0, o.total - r.total)) + ' de venta.' : 'Sin reservas cargadas de este mes todavía.')}</p>
+    </article>`;
+  }).join('');
+
+  cont.querySelectorAll('.obj.cumplido').forEach(c => c.onclick = () => festejar(cap(nombreMes(c.dataset.mes)), 'Objetivo del mes cumplido', 4));
+
+  const nuevos = logros.filter(l => !festejados.has(l.clave));
+  nuevos.forEach(l => festejados.add(l.clave));
+  if(nuevos.length){
+    const mesCompleto = nuevos.find(l => l.completo);
+    if(mesCompleto){
+      festejar('¡' + cap(nombreMes(mesCompleto.mes)) + ' cumplió el objetivo!',
+        'Reservas, ticket promedio y total vendido alcanzados.', 5 + nuevos.length);
+    }else{
+      const l = nuevos[0];
+      festejar('¡Objetivo alcanzado!',
+        cap(nombreMes(l.mes)) + ' · ' + nuevos.map(n => n.et.toLowerCase()).join(' y '), nuevos.length);
+    }
+  }
+}
+
+/* ---------- fuegos artificiales ---------- */
+const cv = $('#fuegos');
+let ctx = null;
+try{ ctx = cv.getContext('2d'); }catch(e){}
+const COLORES = ['#138170','#0d543f','#f2c14e','#ffffff','#e8735a','#7fd1b9'];
+let chispas = [], anim = null, hasta = 0;
+function medirCanvas(){
+  if(!ctx) return;
+  const d = Math.min(window.devicePixelRatio || 1, 2);
+  cv.width = window.innerWidth * d; cv.height = window.innerHeight * d;
+  cv.style.width = window.innerWidth + 'px'; cv.style.height = window.innerHeight + 'px';
+  ctx.setTransform(d,0,0,d,0,0);
+}
+window.addEventListener('resize', medirCanvas);
+
+function explotar(x, y, color){
+  const n = 42 + Math.round(Math.random()*26);
+  for(let i=0;i<n;i++){
+    const ang = (Math.PI*2*i)/n + Math.random()*0.2;
+    const vel = 2 + Math.random()*4.6;
+    chispas.push({x, y, vx:Math.cos(ang)*vel, vy:Math.sin(ang)*vel, vida:1, color});
+  }
+}
+function cuadro(){
+  ctx.clearRect(0,0,window.innerWidth,window.innerHeight);
+  chispas = chispas.filter(p => p.vida > 0.02);
+  chispas.forEach(p => {
+    p.x += p.vx; p.y += p.vy; p.vy += 0.055; p.vx *= 0.985; p.vy *= 0.985; p.vida -= 0.012;
+    ctx.globalAlpha = Math.max(0, p.vida);
+    ctx.fillStyle = p.color;
+    ctx.beginPath(); ctx.arc(p.x, p.y, 2.4, 0, Math.PI*2); ctx.fill();
+  });
+  ctx.globalAlpha = 1;
+  if(chispas.length || Date.now() < hasta){
+    anim = requestAnimationFrame(cuadro);
+  }else{
+    anim = null; cv.classList.remove('activo'); ctx.clearRect(0,0,window.innerWidth,window.innerHeight);
+  }
+}
+function festejar(titulo, texto, intensidad){
+  $('#festejoTitulo').textContent = titulo;
+  $('#festejoTexto').textContent = texto;
+  $('#festejo').classList.add('activo');
+  clearTimeout(festejar._t);
+  festejar._t = setTimeout(() => $('#festejo').classList.remove('activo'), 12000);
+
+  if(!ctx) return;
+  if(window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+  medirCanvas();
+  cv.classList.add('activo');
+  const total = Math.min(60, 8 + intensidad * 7);
+  const duracion = 5200 + intensidad * 500;
+  hasta = Date.now() + duracion;
+  for(let i=0;i<total;i++){
+    setTimeout(() => {
+      if(Date.now() > hasta + 400) return;
+      explotar(window.innerWidth*(0.1 + Math.random()*0.8),
+               window.innerHeight*(0.12 + Math.random()*0.45),
+               COLORES[Math.floor(Math.random()*COLORES.length)]);
+      if(!anim) anim = requestAnimationFrame(cuadro);
+    }, (duracion/total)*i + Math.random()*120);
+  }
+}
+$('#festejoCerrar').onclick = () => { $('#festejo').classList.remove('activo'); hasta = 0; };
+
+/* ---------- claves ---------- */
+async function hashClave(texto){
+  const buf = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(texto));
+  return [...new Uint8Array(buf)].map(b => b.toString(16).padStart(2,'0')).join('');
+}
+async function comprobar(texto, esperado){
+  try{ return (await hashClave(texto)) === esperado; }catch(e){ return false; }
+}
+async function entrar(){
+  const ok = await comprobar($('#claveAcceso').value, CLAVE_ACCESO);
+  if(!ok){
+    $('#errorAcceso').textContent = 'Clave incorrecta. Probá de nuevo.';
+    $('#claveAcceso').select();
+    return;
+  }
+  try{ sessionStorage.setItem('eleton_plazas_ok', '1'); }catch(e){}
+  abrirApp();
+}
+function abrirApp(){
+  $('#acceso').style.display = 'none';
+  document.body.classList.remove('bloqueado');
+  if(!abrirApp.listo){ abrirApp.listo = true; iniciarDatos(); }
+}
+$('#btnEntrar').onclick = entrar;
+$('#claveAcceso').addEventListener('keydown', e => { if(e.key === 'Enter') entrar(); });
+
+function pedirValores(){
+  $('#errorVal').textContent = '';
+  $('#claveVal').value = '';
+  $('#claveValores').classList.add('activa');
+  setTimeout(() => $('#claveVal').focus(), 60);
+}
+async function confirmarValores(){
+  const ok = await comprobar($('#claveVal').value, CLAVE_VALORES);
+  if(!ok){ $('#errorVal').textContent = 'Clave incorrecta.'; $('#claveVal').select(); return; }
+  valoresVisibles = true;
+  $('#claveValores').classList.remove('activa');
+  render();
+}
+document.querySelectorAll('.ojo').forEach(b => b.onclick = () => {
+  if(valoresVisibles){ valoresVisibles = false; render(); } else { pedirValores(); }
+});
+$('#btnVerVal').onclick = confirmarValores;
+$('#btnCancelarVal').onclick = () => $('#claveValores').classList.remove('activa');
+$('#claveVal').addEventListener('keydown', e => { if(e.key === 'Enter') confirmarValores(); });
+$('#claveValores').addEventListener('click', e => { if(e.target.id === 'claveValores') $('#claveValores').classList.remove('activa'); });
+
+/* ---------- copiar a la planilla ---------- */
+function copiar(){
+  const vista = filtrar(datos.map(calcular));
+  const cab = ['Fecha de la reserva','Número de la reserva','Adultos','Niños','Noches','Adultos Total','Niños Total',
+    'Valor Adultos sin IVA','Valor Adultos','Valor Menor sin IVA','Valor Menor','Total de la habitación','Saldo pendiente','Sin pago'];
+  const dec = n => String(Math.round((n||0)*100)/100).replace('.',',');
+  const filas = vista.map(r => [r.fecha, r.nro, r.adultos, r.ninos, r.noches, r.adultosTotal, r.ninosTotal,
+    dec(r.valorAdSinIva), valoresVisibles ? dec(r.valorAdultos) : '', dec(r.menorSinIva),
+    valoresVisibles ? dec(r.valorMenor) : '', dec(r.total), dec(r.saldo),
+    r.sinPago ? 'SIN PAGO' : ''].join('\t'));
+  const texto = [cab.join('\t'), ...filas].join('\n');
+  const listo = ok => { const b = $('#btnCopiar'); b.textContent = ok ? 'Copiado ✓' : 'No se pudo copiar'; setTimeout(()=> b.textContent = 'Copiar para la planilla', 2200); };
+  if(navigator.clipboard && window.isSecureContext){
+    navigator.clipboard.writeText(texto).then(()=>listo(true), ()=>listo(false));
+  }else{
+    const ta = document.createElement('textarea');
+    ta.value = texto; ta.style.position = 'fixed'; ta.style.opacity = '0';
+    document.body.appendChild(ta); ta.select();
+    let ok = false; try{ ok = document.execCommand('copy'); }catch(e){}
+    document.body.removeChild(ta); listo(ok);
+  }
+}
+
+/* ---------- eventos ---------- */
+$('#btnCargar').onclick = () => $('#archivo').click();
+$('#btnCargar2').onclick = () => $('#archivo').click();
+$('#archivo').onchange = e => { if(e.target.files[0]) leerArchivo(e.target.files[0]); e.target.value = ''; };
+$('#btnCopiar').onclick = copiar;
+$('#btnVaciar').onclick = () => {
+  if(!confirm('Se borran todas las reservas cargadas en este dispositivo. ¿Seguimos?')) return;
+  datos = []; guardar(); render();
+  $('#periodo').textContent = 'Sin reservas cargadas. Cargá el reporte de Cloudbeds del mes.';
+};
+['#fMes','#fSinPago'].forEach(s => $(s).onchange = render);
+$('#fBuscar').oninput = render;
+$('#btnParam').onclick = () => {
+  params.menorSinIva = parseFloat($('#pMenorSinIva').value) || P_DEF.menorSinIva;
+  params.alicuota = parseFloat($('#pAlicuota').value) || P_DEF.alicuota;
+  params.valorMenor = parseFloat($('#pValorMenor').value) || P_DEF.valorMenor;
+  guardar(); render();
+  const b = $('#btnParam'); b.textContent = 'Guardado ✓'; setTimeout(()=> b.textContent = 'Guardar parámetros', 1800);
+};
+
+let arrastre = 0;
+window.addEventListener('dragenter', e => { e.preventDefault(); arrastre++; $('#zona').classList.add('activa'); });
+window.addEventListener('dragover', e => e.preventDefault());
+window.addEventListener('dragleave', () => { if(--arrastre <= 0){ arrastre = 0; $('#zona').classList.remove('activa'); } });
+window.addEventListener('drop', e => {
+  e.preventDefault(); arrastre = 0; $('#zona').classList.remove('activa');
+  if(e.dataTransfer.files && e.dataTransfer.files[0]) leerArchivo(e.dataTransfer.files[0]);
+});
+
+/* ---------- modo planilla de Google ---------- */
+const EN_PLANILLA = typeof google !== 'undefined' && google.script && google.script.run;
+function traerDePlanilla(){
+  $('#periodo').textContent = 'Leyendo la planilla…';
+  google.script.run
+    .withSuccessHandler(filas => {
+      datos = filas.map(a => ({fecha:a[0], nro:String(a[1]), adultos:a[2], ninos:a[3], noches:a[4], menorSinIva:a[5], total:a[6], saldo:a[7]}));
+      render();
+      $('#periodo').textContent = datos.length + ' reservas leídas de la planilla · ' + new Date().toLocaleString('es-AR');
+    })
+    .withFailureHandler(err => { $('#periodo').textContent = 'No pude leer la planilla: ' + err.message; })
+    .obtenerReservas();
+}
+
+/* ---------- arranque ---------- */
+function iniciarDatos(){
+  $('#pMenorSinIva').value = params.menorSinIva;
+  $('#pAlicuota').value = params.alicuota;
+  $('#pValorMenor').value = params.valorMenor;
+  if(EN_PLANILLA){
+    google.script.run.withSuccessHandler(obj => {
+      if(obj && obj.length){ objetivos = obj; render(); }
+    }).obtenerObjetivos();
+    $('#btnCargar').textContent = 'Actualizar desde la planilla';
+    $('#btnCargar').onclick = traerDePlanilla;
+    $('#btnVaciar').classList.add('oculto');
+    datos = [];
+    render();
+    traerDePlanilla();
+    return;
+  }
+  const guardados = recuperar();
+  datos = guardados || SEED.map(a => ({fecha:a[0], nro:a[1], adultos:a[2], ninos:a[3], noches:a[4], menorSinIva:a[5], total:a[6], saldo:a[7]}));
+  render();
+  if(!guardados && datos.length) $('#periodo').textContent = 'Cargado el reporte de ejemplo con ' + datos.length + ' reservas. Cargá el archivo del mes para reemplazarlo o sumar meses nuevos.';
+}
+
+(function arrancar(){
+  let entrado = false;
+  try{ entrado = sessionStorage.getItem('eleton_plazas_ok') === '1'; }catch(e){}
+  if(entrado) abrirApp(); else setTimeout(() => $('#claveAcceso').focus(), 120);
+})();
+</script>
+</body>
+</html>
