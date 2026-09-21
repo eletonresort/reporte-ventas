@@ -170,6 +170,25 @@
   #festejo span{font-size:13px;color:#cfe3db}
   #festejo button{background:none;border:0;color:#fff;cursor:pointer;font:inherit;font-size:12px;text-decoration:underline;padding:6px 0 0}
 
+  .perfil-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(230px,1fr));gap:14px}
+  .pcard{background:var(--blanco);border:1px solid var(--linea);border-radius:3px;padding:16px 18px}
+  .pcard .nm{font-weight:700;font-size:14px;color:var(--verde-oscuro)}
+  .pcard .n{font-family:"Playfair Display",Georgia,serif;font-weight:900;font-size:28px;line-height:1.1;margin-top:8px;color:var(--texto)}
+  .pcard .pct{font-size:12px;color:var(--texto-suave);margin-top:2px}
+  .pcard .tk{font-size:13px;margin-top:10px;padding-top:10px;border-top:1px solid var(--linea)}
+  .pcard .tk2{font-size:13px;margin-top:4px}
+  .pcard .tk b,.pcard .tk2 b{color:var(--verde-oscuro)}
+  .pcard h3{font-size:17px;color:var(--verde-oscuro);margin-bottom:14px}
+  .bfila{margin-bottom:12px}
+  .bfila:last-child{margin-bottom:0}
+  .btop{display:flex;justify-content:space-between;gap:8px;font-size:13px;margin-bottom:5px}
+  .btop .nom{font-weight:600}
+  .btop .cant{color:var(--texto-suave)}
+  .bpista{height:8px;background:var(--verde-claro);border-radius:4px;overflow:hidden}
+  .bpista i{display:block;height:100%;border-radius:4px;background:var(--verde)}
+  .bpista i.f{background:#c9769a}
+  .bpista i.x{background:#a9a68f}
+
   .paginador{display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:10px;margin-top:12px}
   .paginador .info{font-size:12.5px;color:var(--texto-suave)}
   .paginador .pags{display:flex;flex-wrap:wrap;gap:4px}
@@ -289,6 +308,27 @@
     <div class="objetivos" id="listaObjetivos"></div>
   </section>
 
+  <section class="seccion" id="bloqueTemporada">
+    <h2>Reservas por temporada <span style="font-weight:500;font-style:italic;font-size:.75em">(según fecha de estadía)</span></h2>
+    <p class="nota" id="notaTemporada"></p>
+    <div class="perfil-grid" id="gridTemporada"></div>
+  </section>
+
+  <section class="seccion" id="bloqueGrupo">
+    <h2>Perfil por tipo de reserva</h2>
+    <div class="perfil-grid" id="gridGrupo"></div>
+    <p class="nota" style="margin-top:10px">Pareja = 2 personas (adultos + niños) · Familia = más de 2 · Individual = 1.</p>
+  </section>
+
+  <section class="seccion" id="bloquePerfil">
+    <h2>Perfil del huésped</h2>
+    <div class="perfil-grid">
+      <div class="pcard"><h3>Género</h3><div id="barGenero"></div></div>
+      <div class="pcard"><h3>Top 5 provincias</h3><div id="barProv"></div></div>
+      <div class="pcard"><h3>Rango etario</h3><div id="barEdad"></div></div>
+    </div>
+  </section>
+
   <section class="seccion" id="bloqueMeses">
     <h2>Resumen por mes</h2>
     <p class="nota">Cada mes se suma al conteo general. Tocá un mes para filtrar el detalle.</p>
@@ -306,7 +346,7 @@
 
   <section class="seccion" id="bloqueDetalle">
     <h2>Detalle de reservas</h2>
-    <p class="nota">Las filas marcadas tienen el saldo pendiente igual al total de la habitación: no abonaron nada.</p>
+    <p class="nota">Las filas marcadas tienen el saldo pendiente igual al total de la reserva (Total general, o Total de la habitación si el reporte no lo trae): no abonaron nada.</p>
     <div class="tabla-caja">
       <table id="tablaDetalle">
         <thead><tr>
@@ -438,8 +478,10 @@ function calcular(r){
   const valorAdSinIva = adultosTotal > 0 ? (r.total - menorSinIva * ninosTotal) / adultosTotal : 0;
   const valorAdultos = valorAdSinIva * params.alicuota * adultosTotal;
   const valorMenor = params.valorMenor * ninosTotal;
-  const sinPago = r.total > 0 && r.saldo >= r.total - 1;
-  return Object.assign({}, r, {adultosTotal, ninosTotal, menorSinIva, valorAdSinIva, valorAdultos, valorMenor, sinPago});
+  const venta = r.totalGeneral > 0 ? r.totalGeneral : r.total;       // lo que paga el huésped
+  const cancelada = /cancel|no se present|no.?show/i.test(r.estado || '');
+  const sinPago = !cancelada && venta > 0 && r.saldo >= venta - 1;
+  return Object.assign({}, r, {adultosTotal, ninosTotal, menorSinIva, valorAdSinIva, valorAdultos, valorMenor, venta, cancelada, sinPago});
 }
 
 /* ---------- lectura del reporte ---------- */
@@ -463,6 +505,32 @@ const num = v => {
   return isNaN(n) ? 0 : n;
 };
 
+const texto = (f, i) => i >= 0 ? String(f[i] == null ? '' : f[i]).trim() : '';
+function fechaOVacio(f, i){
+  if(i < 0) return '';
+  const p = parseFecha(f[i]);
+  return p ? fechaTexto(p) : '';
+}
+function calcEdad(nac, ref){
+  const n = parseFecha(nac), r = parseFecha(ref);
+  if(!n || !r) return null;
+  let e = r.a - n.a;
+  if(r.m < n.m || (r.m === n.m && r.d < n.d)) e--;
+  return e >= 0 && e < 115 ? e : null;
+}
+/* El reporte de Cloudbeds trae dos columnas "Estado": una es la provincia y otra el estado de la
+   reserva (Confirmado, Cancelado…). Se distinguen mirando qué valores tienen. */
+const RE_ESTADO_RESERVA = /confirm|cancel|no se present|no.?show|pendiente|registrad|check|en casa|reservad|finalizad/i;
+function resolverEstados(c, cab, cuerpo){
+  const candidatas = cab.map((h, i) => h === 'estado' ? i : -1).filter(i => i >= 0);
+  candidatas.forEach(i => {
+    const vals = cuerpo.map(f => String((f || [])[i] || '').trim()).filter(Boolean).slice(0, 60);
+    const esEstado = vals.length && vals.filter(v => RE_ESTADO_RESERVA.test(v)).length >= vals.length / 2;
+    if(esEstado){ if(c.estado < 0) c.estado = i; }
+    else if(c.provincia < 0) c.provincia = i;
+  });
+}
+
 function importar(filas){
   if(!filas.length) throw new Error('El archivo está vacío.');
   let iCab = 0;
@@ -478,8 +546,17 @@ function importar(filas){
     noches: buscarCol(cab,['noches']),
     menorSinIva: buscarCol(cab,['valor menor sin iva']),
     total: buscarCol(cab,['total de la habitacion','total habitacion']),
-    saldo: buscarCol(cab,['saldo pendiente','saldo'])
+    saldo: buscarCol(cab,['saldo pendiente','saldo']),
+    totalGeneral: buscarCol(cab,['total general']),
+    genero: buscarCol(cab,['genero']),
+    pais: buscarCol(cab,['pais']),
+    nacimiento: buscarCol(cab,['fecha de nacimiento']),
+    llegada: buscarCol(cab,['fecha de llegada','llegada','check-in','check in']),
+    salida: buscarCol(cab,['fecha de salida','salida','check-out','check out']),
+    provincia: buscarCol(cab,['estado o provincia','provincia']),
+    estado: buscarCol(cab,['estado de la reserva'])
   };
+  resolverEstados(c, cab, filas.slice(iCab + 1));
   if(c.nro < 0 || c.adultos < 0 || c.noches < 0 || c.total < 0)
     throw new Error('No encontré las columnas del reporte (Número de la reserva, Adultos, Noches, Total de la habitación).');
 
@@ -497,16 +574,35 @@ function importar(filas){
       noches: noches,
       menorSinIva: c.menorSinIva >= 0 ? num(f[c.menorSinIva]) : 0,
       total: num(f[c.total]),
-      saldo: c.saldo >= 0 ? num(f[c.saldo]) : 0
+      saldo: c.saldo >= 0 ? num(f[c.saldo]) : 0,
+      totalGeneral: c.totalGeneral >= 0 ? num(f[c.totalGeneral]) : 0,
+      genero: texto(f, c.genero),
+      provincia: texto(f, c.provincia),
+      pais: texto(f, c.pais),
+      nacimiento: fechaOVacio(f, c.nacimiento),
+      llegada: fechaOVacio(f, c.llegada),
+      salida: fechaOVacio(f, c.salida),
+      estado: texto(f, c.estado)
     });
   }
+  // qué columnas trajo el archivo: la planilla actualiza solo esas
+  const campos = Object.keys(c).filter(k => c[k] >= 0).map(k => k === 'estado' ? 'estadoReserva' : k);
+  nuevas.forEach(r => { r.edad = calcEdad(r.nacimiento, r.llegada || r.fecha); r.estadoReserva = r.estado; });
   if(!nuevas.length) throw new Error('No encontré reservas en el archivo.');
 
-  if(params.url && !EN_PLANILLA){ subirAPlanilla(nuevas); return; }
+  if(params.url && !EN_PLANILLA){ subirAPlanilla(nuevas, campos); return; }
 
+  // sin planilla: se combina con lo guardado, pisando solo las columnas que trajo el archivo
+  const clavesLocales = campos.filter(k => k !== 'nacimiento' && k !== 'estadoReserva').concat(campos.includes('estadoReserva') ? ['estado'] : [], campos.includes('nacimiento') ? ['edad'] : []);
   const porNro = new Map(datos.map(r => [r.nro, r]));
   let agregadas = 0, actualizadas = 0;
-  nuevas.forEach(r => { porNro.has(r.nro) ? actualizadas++ : agregadas++; porNro.set(r.nro, r); });
+  nuevas.forEach(r => {
+    const previo = porNro.get(r.nro);
+    previo ? actualizadas++ : agregadas++;
+    const parte = {};
+    clavesLocales.forEach(k => parte[k] = r[k]);
+    porNro.set(r.nro, Object.assign({}, previo || {}, parte));
+  });
   datos = [...porNro.values()];
   guardar();
   render();
@@ -548,9 +644,11 @@ function totales(lista){
 }
 
 function render(){
-  const calc = datos.map(calcular);
+  const todas = datos.map(calcular);
+  const canceladas = todas.filter(r => r.cancelada).length;
+  const calc = todas.filter(r => !r.cancelada);
   const vacio = calc.length === 0;
-  ['#bloqueKpis','#bloqueMeses','#bloqueDetalle','#filtros'].forEach(s => $(s).style.display = vacio ? 'none' : '');
+  ['#bloqueKpis','#bloqueMeses','#bloqueDetalle','#filtros','#bloqueTemporada','#bloqueGrupo','#bloquePerfil'].forEach(s => $(s).style.display = vacio ? 'none' : '');
   $('#bloqueVacio').style.display = vacio ? '' : 'none';
   $('#textoVacio').textContent = params.url
     ? 'La planilla todavía no tiene reservas. Cargá el reporte de Cloudbeds y se guarda ahí para todos.'
@@ -578,13 +676,16 @@ function render(){
   document.querySelectorAll('.ojo').forEach(b => b.textContent = valoresVisibles ? 'Ocultar valor' : 'Mostrar valor');
   $('#kSinPago').textContent = ent(t.sinPago);
   $('#kSinPagoDet').textContent = t.sinPago ? money(t.saldoSinPago) + ' a reclamar' : 'Todas registran algún pago';
-  $('#contador').textContent = vista.length + ' de ' + calc.length + ' reservas · saldo pendiente total ' + money(t.saldo);
+  $('#contador').textContent = vista.length + ' de ' + calc.length + ' reservas · saldo pendiente total ' + money(t.saldo) +
+    (canceladas ? ' · ' + canceladas + (canceladas === 1 ? ' cancelada excluida' : ' canceladas excluidas') : '');
 
-  const raros = vista.filter(r => r.saldo > r.total + 1).length;
+  renderPerfil(vista);
+
+  const raros = vista.filter(r => r.saldo > r.venta + 1).length;
   const av = $('#avisoSaldo');
   av.classList.toggle('oculto', raros === 0);
   if(raros) av.textContent = raros + (raros === 1 ? ' reserva tiene' : ' reservas tienen') +
-    ' un saldo pendiente mayor al total de la habitación (el saldo incluye consumos o extras fuera del alojamiento). Quedan marcadas como sin pago.';
+    ' un saldo pendiente mayor al total de la reserva. Quedan marcadas como sin pago. Si el reporte no trae la columna Total general, sumala al exportar.';
 
   // resumen por mes (respeta buscador y filtro de sin pago, no el mes elegido)
   const baseMes = calc.filter(r => (!$('#fBuscar').value.trim() || r.nro.toLowerCase().includes($('#fBuscar').value.trim().toLowerCase())) && (!$('#fSinPago').checked || r.sinPago));
@@ -635,6 +736,105 @@ function render(){
   renderObjetivos(calc);
 }
 
+/* ---------- temporada, tipo de reserva y perfil del huésped ---------- */
+function clasificarTemporada(llegada, salida){
+  const i = parseFecha(llegada), o = parseFecha(salida);
+  if(!i) return null;
+  const md = i.m * 100 + i.d;
+  if(md === 1223 || md === 1224) return 'Navidad';
+  const ini = new Date(i.a, i.m - 1, i.d), fin = o ? new Date(o.a, o.m - 1, o.d) : null;
+  for(const y of [i.a, i.a - 1]){
+    const ny = new Date(y, 11, 31);
+    if(fin && ny >= ini && ny <= fin) return 'Año Nuevo';
+  }
+  if(i.m === 1) return 'Verano';
+  if(i.m === 2 && i.d <= 27) return 'Verano';
+  if((i.m === 2 && i.d >= 28) || (i.m === 3 && i.d <= 23)) return 'Cierre de Temporada';
+  if(i.m === 3 && i.d >= 24 && i.d <= 28) return 'Semana Santa';
+  return 'Otras fechas';
+}
+const ORDEN_TEMPORADA = ['Navidad','Año Nuevo','Verano','Cierre de Temporada','Semana Santa','Otras fechas'];
+function tipoGrupo(r){
+  const p = (r.adultos || 0) + (r.ninos || 0);
+  if(p <= 0) return 'Sin datos';
+  if(p === 1) return 'Individual';
+  if(p === 2) return 'Pareja';
+  return 'Familia';
+}
+function rangoEdad(e){
+  if(e == null) return null;
+  if(e < 18) return '0 a 17';
+  if(e <= 25) return '18 a 25';
+  if(e <= 35) return '26 a 35';
+  if(e <= 45) return '36 a 45';
+  if(e <= 55) return '46 a 55';
+  if(e <= 65) return '56 a 65';
+  return '66+';
+}
+const promedio = arr => { const v = arr.filter(x => x != null && !isNaN(x)); return v.length ? v.reduce((a,b)=>a+b,0) / v.length : 0; };
+const plata = n => '$' + Math.round(n || 0).toLocaleString('es-AR');
+const escHtml = s => String(s == null ? '' : s).replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+
+function barras(cont, items){
+  const max = Math.max(1, ...items.map(i => i.n));
+  cont.innerHTML = items.length ? items.map(i => `<div class="bfila">
+      <div class="btop"><span class="nom">${escHtml(i.nombre)}</span><span class="cant">${i.n}${i.extra || ''}</span></div>
+      <div class="bpista"><i class="${i.cls || ''}" style="width:${(i.n / max * 100).toFixed(1)}%"></i></div>
+    </div>`).join('') : '<p class="nota">Sin datos en el reporte.</p>';
+}
+function tarjetas(cont, stats, conNoches){
+  cont.innerHTML = stats.map(s => `<div class="pcard">
+      <div class="nm">${escHtml(s.nombre)}</div>
+      <div class="n">${s.n}</div>
+      <div class="pct">${s.pct.toFixed(0)}% ${s.base}</div>
+      <div class="tk">Ticket prom.: <b>${plata(s.ticket)}</b></div>
+      ${conNoches ? `<div class="tk2">Noches prom.: <b>${s.noches.toFixed(1)}</b></div>` : ''}
+    </div>`).join('');
+}
+
+function renderPerfil(vista){
+  const total = vista.length;
+  const base = $('#fMes').value ? 'del mes' : 'del total';
+  const agrupar = (clave, orden) => orden.map(nombre => {
+    const items = vista.filter(r => clave(r) === nombre);
+    return { nombre, n: items.length, pct: total ? items.length / total * 100 : 0, base,
+             ticket: promedio(items.map(r => r.venta)), noches: promedio(items.map(r => r.noches)) };
+  }).filter(s => s.n > 0);
+
+  // temporada: necesita la fecha de llegada
+  const conLlegada = vista.filter(r => r.llegada);
+  if(conLlegada.length){
+    tarjetas($('#gridTemporada'), agrupar(r => clasificarTemporada(r.llegada, r.salida), ORDEN_TEMPORADA), false);
+    $('#notaTemporada').textContent = conLlegada.length < total ? (total - conLlegada.length) + ' reservas sin fecha de llegada no se clasifican.' : '';
+  }else{
+    $('#gridTemporada').innerHTML = '';
+    $('#notaTemporada').textContent = 'Para ver esta sección, al exportar de Cloudbeds sumá las columnas “Fecha de llegada” y “Salida”.';
+  }
+
+  tarjetas($('#gridGrupo'), agrupar(tipoGrupo, ['Pareja','Familia','Individual','Sin datos']), true);
+
+  const nG = t => vista.filter(r => norm(r.genero) === t).length;
+  const fem = nG('femenino'), masc = nG('masculino'), otro = total - fem - masc;
+  const pc = n => total ? ` (${Math.round(n / total * 100)}%)` : '';
+  barras($('#barGenero'), [
+    { nombre:'Femenino', n:fem, extra:pc(fem), cls:'f' },
+    { nombre:'Masculino', n:masc, extra:pc(masc) },
+    { nombre:'No especificado', n:otro, cls:'x' }
+  ].filter(i => i.n > 0));
+
+  const prov = {};
+  vista.forEach(r => {
+    const extranjero = r.pais && norm(r.pais) !== 'argentina';
+    const nombre = r.provincia || (extranjero ? r.pais : 'Sin datos');
+    prov[nombre] = (prov[nombre] || 0) + 1;
+  });
+  barras($('#barProv'), Object.entries(prov).sort((a,b) => b[1] - a[1]).slice(0, 5).map(([nombre, n]) => ({nombre, n})));
+
+  const rangos = {};
+  vista.forEach(r => { const b = rangoEdad(r.edad); if(b) rangos[b] = (rangos[b] || 0) + 1; });
+  barras($('#barEdad'), ['0 a 17','18 a 25','26 a 35','36 a 45','46 a 55','56 a 65','66+'].filter(b => rangos[b]).map(b => ({nombre:b, n:rangos[b]})));
+}
+
 /* ---------- paginador del detalle ---------- */
 function renderPaginador(total, totalPaginas, desde, cantidad){
   const cont = $('#paginador');
@@ -673,7 +873,7 @@ function renderObjetivos(calc){
     const k = claveMes(parseFecha(r.fecha));
     if(!real.has(k)) real.set(k, {reservas:0, total:0});
     const m = real.get(k);
-    m.reservas++; m.total += r.total;
+    m.reservas++; m.total += r.total;   // objetivos: Total de la habitación, como siempre
   });
 
   const logros = [];
@@ -835,7 +1035,9 @@ $('#claveVal').addEventListener('keydown', e => { if(e.key === 'Enter') confirma
 $('#claveValores').addEventListener('click', e => { if(e.target.id === 'claveValores') $('#claveValores').classList.remove('activa'); });
 
 /* ---------- conexión con la planilla ---------- */
-const desdePlanilla = arr => arr.map(a => ({fecha:a[0], nro:String(a[1]), adultos:a[2], ninos:a[3], noches:a[4], menorSinIva:a[5], total:a[6], saldo:a[7]}));
+const desdePlanilla = arr => arr.map(a => ({fecha:a[0], nro:String(a[1]), adultos:a[2], ninos:a[3], noches:a[4], menorSinIva:a[5], total:a[6], saldo:a[7],
+  totalGeneral:a[8] || 0, genero:a[9] || '', provincia:a[10] || '', pais:a[11] || '', edad:(a[12] === '' || a[12] == null) ? null : a[12],
+  llegada:a[13] || '', salida:a[14] || '', estado:a[15] || ''}));
 
 let _resolverCarga = null;
 function pedirClaveCarga(cantidad, error){
@@ -857,7 +1059,7 @@ $('#btnConfirmarCarga').onclick = () => cerrarCarga($('#claveCargaInput').value)
 $('#btnCancelarCarga').onclick = () => cerrarCarga(null);
 $('#claveCargaInput').addEventListener('keydown', e => { if(e.key === 'Enter') cerrarCarga($('#claveCargaInput').value); });
 
-async function subirAPlanilla(nuevas){
+async function subirAPlanilla(nuevas, campos){
   let error = '';
   const b = $('#btnCargar');
   while(true){
@@ -869,7 +1071,7 @@ async function subirAPlanilla(nuevas){
       const r = await fetch(params.url, {
         method: 'POST',
         headers: {'Content-Type': 'text/plain;charset=utf-8'},
-        body: JSON.stringify({token: TOKEN_PLANILLA, clave: clave, reservas: nuevas})
+        body: JSON.stringify({token: TOKEN_PLANILLA, clave: clave, reservas: nuevas, campos: campos})
       });
       if(!r.ok) throw new Error('el enlace respondió ' + r.status);
       const j = await r.json();
@@ -980,7 +1182,7 @@ function traerDePlanilla(){
   $('#periodo').textContent = 'Leyendo la planilla…';
   google.script.run
     .withSuccessHandler(filas => {
-      datos = filas.map(a => ({fecha:a[0], nro:String(a[1]), adultos:a[2], ninos:a[3], noches:a[4], menorSinIva:a[5], total:a[6], saldo:a[7]}));
+      datos = desdePlanilla(filas);
       render();
       $('#periodo').textContent = datos.length + ' reservas leídas de la planilla · ' + new Date().toLocaleString('es-AR');
     })
