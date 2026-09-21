@@ -170,6 +170,15 @@
   #festejo span{font-size:13px;color:#cfe3db}
   #festejo button{background:none;border:0;color:#fff;cursor:pointer;font:inherit;font-size:12px;text-decoration:underline;padding:6px 0 0}
 
+  .paginador{display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:10px;margin-top:12px}
+  .paginador .info{font-size:12.5px;color:var(--texto-suave)}
+  .paginador .pags{display:flex;flex-wrap:wrap;gap:4px}
+  .paginador button{font-family:inherit;font-size:13px;min-width:36px;padding:7px 10px;border:1px solid var(--linea);background:var(--blanco);color:var(--verde-oscuro);border-radius:2px;cursor:pointer}
+  .paginador button:hover:not(:disabled){background:var(--verde-claro)}
+  .paginador button.activa{background:var(--verde-oscuro);color:#fff;border-color:var(--verde-oscuro);font-weight:700}
+  .paginador button:disabled{opacity:.4;cursor:default}
+  .paginador .sep{padding:7px 4px;color:var(--texto-suave)}
+
   @media (max-width:640px){
     .wrap{padding:0 14px}
     .kpi .val{font-size:26px}
@@ -295,6 +304,7 @@
         <tfoot></tfoot>
       </table>
     </div>
+    <div class="paginador" id="paginador"></div>
   </section>
 
   <section class="seccion" id="bloqueVacio" style="display:none">
@@ -343,6 +353,8 @@ const P_DEF = { menorSinIva: 100000, alicuota: 0.0063, valorMenor: 715, url: '' 
 const TOKEN_PLANILLA = 'eleton-plazas-2026';   // tiene que coincidir con el TOKEN del script
 let params = Object.assign({}, P_DEF);
 let datos = [];
+const POR_PAGINA = 25;
+let pagina = 1;
 
 /* Claves (SHA-256). Para cambiarlas: abrí la consola del navegador y ejecutá
    await hashClave('la-nueva-clave'), y pegá el resultado acá.
@@ -582,7 +594,11 @@ function render(){
     const fa = parseFecha(a.fecha), fb = parseFecha(b.fecha);
     return (fa ? fa.a*10000+fa.m*100+fa.d : 0) - (fb ? fb.a*10000+fb.m*100+fb.d : 0);
   });
-  $('#tablaDetalle tbody').innerHTML = orden.map(r => `<tr class="${r.sinPago ? 'sinpago' : ''}">
+  const totalPaginas = Math.max(1, Math.ceil(orden.length / POR_PAGINA));
+  pagina = Math.min(Math.max(1, pagina), totalPaginas);
+  const desde = (pagina - 1) * POR_PAGINA;
+  const visibles = orden.slice(desde, desde + POR_PAGINA);
+  $('#tablaDetalle tbody').innerHTML = visibles.map(r => `<tr class="${r.sinPago ? 'sinpago' : ''}">
     <td class="izq">${r.fecha}</td>
     <td class="izq">${r.nro}${r.sinPago ? '<span class="tag">SIN PAGO</span>' : ''}</td>
     <td>${r.adultos}</td><td>${r.ninos}</td><td>${r.noches}</td>
@@ -594,9 +610,39 @@ function render(){
     <td>${ent(t.adultosTotal)}</td><td>${ent(t.ninosTotal)}</td><td>—</td><td>${mv(t.valorAdultos)}</td>
     <td>—</td><td>${mv(t.valorMenor)}</td><td>${money(t.total)}</td><td>${money(t.saldo)}</td></tr>`;
 
-  document.querySelectorAll('.mes-link').forEach(b => b.onclick = () => { $('#fMes').value = b.dataset.mes; render(); });
+  renderPaginador(orden.length, totalPaginas, desde, visibles.length);
+
+  document.querySelectorAll('.mes-link').forEach(b => b.onclick = () => { $('#fMes').value = b.dataset.mes; pagina = 1; render(); });
 
   renderObjetivos(calc);
+}
+
+/* ---------- paginador del detalle ---------- */
+function renderPaginador(total, totalPaginas, desde, cantidad){
+  const cont = $('#paginador');
+  if(total <= POR_PAGINA){
+    cont.innerHTML = total ? `<span class="info">${total} ${total === 1 ? 'reserva' : 'reservas'}</span>` : '';
+    return;
+  }
+  // números a mostrar: primera, última y las cercanas a la actual
+  const nums = [];
+  for(let i = 1; i <= totalPaginas; i++){
+    if(i === 1 || i === totalPaginas || Math.abs(i - pagina) <= 1) nums.push(i);
+    else if(nums[nums.length - 1] !== '…') nums.push('…');
+  }
+  cont.innerHTML = `<span class="info">Mostrando ${desde + 1}–${desde + cantidad} de ${total} reservas</span>
+    <div class="pags">
+      <button data-p="${pagina - 1}" ${pagina === 1 ? 'disabled' : ''} aria-label="Página anterior">‹ Anterior</button>
+      ${nums.map(n => n === '…' ? '<span class="sep">…</span>'
+        : `<button data-p="${n}" class="${n === pagina ? 'activa' : ''}" ${n === pagina ? 'aria-current="page"' : ''}>${n}</button>`).join('')}
+      <button data-p="${pagina + 1}" ${pagina === totalPaginas ? 'disabled' : ''} aria-label="Página siguiente">Siguiente ›</button>
+    </div>`;
+  cont.querySelectorAll('button[data-p]').forEach(b => b.onclick = () => {
+    pagina = +b.dataset.p;
+    render();
+    const sec = $('#bloqueDetalle');
+    if(sec.scrollIntoView) sec.scrollIntoView({behavior:'smooth', block:'start'});
+  });
 }
 
 /* ---------- objetivos de venta ---------- */
@@ -835,8 +881,8 @@ $('#btnVaciar').onclick = () => {
   datos = []; guardar(); render();
   $('#periodo').textContent = 'Sin reservas cargadas. Cargá el reporte de Cloudbeds del mes.';
 };
-['#fMes','#fSinPago'].forEach(s => $(s).onchange = render);
-$('#fBuscar').oninput = render;
+['#fMes','#fSinPago'].forEach(s => $(s).onchange = () => { pagina = 1; render(); });
+$('#fBuscar').oninput = () => { pagina = 1; render(); };
 $('#btnParam').onclick = () => {
   params.menorSinIva = parseFloat($('#pMenorSinIva').value) || P_DEF.menorSinIva;
   params.alicuota = parseFloat($('#pAlicuota').value) || P_DEF.alicuota;
