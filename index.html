@@ -348,7 +348,7 @@
 
   <section class="seccion" id="bloqueCortes">
     <h2>Cortes mensuales · reporte de lo vendido</h2>
-    <p class="nota">El corte toma las reservas totalmente pagas que todavía no entraron en ningún corte. Las que tengan saldo quedan para el corte siguiente. El conteo de plazas no se modifica.</p>
+    <p class="nota">El corte toma las reservas con seña o pago total que todavía no entraron en ningún corte. Las que no abonaron nada quedan para el corte siguiente. El conteo de plazas no se modifica.</p>
     <div class="corte-caja" id="cajaCortes"></div>
   </section>
 
@@ -789,8 +789,9 @@ function totalesCorte(lista){
   return lista.reduce((t,r) => ({
     reservas:t.reservas+1, adultosTotal:t.adultosTotal+r.adultosTotal, ninosTotal:t.ninosTotal+r.ninosTotal,
     valAdultos:t.valAdultos+r.valorAdultos, valMenor:t.valMenor+r.valorMenor,
-    total:t.total+r.total, totalGeneral:t.totalGeneral+r.venta
-  }), {reservas:0,adultosTotal:0,ninosTotal:0,valAdultos:0,valMenor:0,total:0,totalGeneral:0});
+    total:t.total+r.total, totalGeneral:t.totalGeneral+r.venta,
+    cobrado:t.cobrado+Math.max(0, r.venta - r.saldo), saldo:t.saldo+r.saldo
+  }), {reservas:0,adultosTotal:0,ninosTotal:0,valAdultos:0,valMenor:0,total:0,totalGeneral:0,cobrado:0,saldo:0});
 }
 
 function renderCortes(calc){
@@ -799,15 +800,15 @@ function renderCortes(calc){
     caja.innerHTML = '<p class="nota">Los cortes se guardan en la planilla. Conectá la app para poder usarlos.</p>';
     return;
   }
-  const listas = calc.filter(r => !r.corte && r.saldo < 1);
-  const pendientes = calc.filter(r => !r.corte && r.saldo >= 1);
+  const listas = calc.filter(r => !r.corte && !r.sinPago);        // con seña o pago total
+  const pendientes = calc.filter(r => !r.corte && r.sinPago);      // no abonaron nada
   const tl = totalesCorte(listas), tp = totalesCorte(pendientes);
 
   caja.innerHTML = `<div class="corte-resumen">
       <div class="corte-dato"><div class="et">Listas para cortar</div><div class="vl">${ent(tl.reservas)}</div>
-        <div class="sb">${money(tl.totalGeneral)} cobrados</div></div>
+        <div class="sb">${money(tl.totalGeneral)} vendidos · ${money(tl.cobrado)} cobrados</div></div>
       <div class="corte-dato"><div class="et">Pasan al próximo corte</div><div class="vl">${ent(tp.reservas)}</div>
-        <div class="sb">${money(tp.totalGeneral)} sin cobrar</div></div>
+        <div class="sb">${money(tp.totalGeneral)} sin seña</div></div>
       <div class="corte-acciones">
         <button class="btn btn-chico" id="btnVerPrevio">Ver detalle</button>
         <button class="btn btn-chico" id="btnHacerCorte" style="background:var(--verde-oscuro);color:#fff;border-color:var(--verde-oscuro)">Hacer corte</button>
@@ -816,7 +817,7 @@ function renderCortes(calc){
     <div class="corte-lista">
       ${cortes.length ? cortes.slice().reverse().map(c => `<div class="corte-item">
           <div><div class="tit">${escHtml(c.etiqueta)}</div>
-            <div class="meta">Cortado el ${escHtml(c.fecha)} · ${ent(c.reservas)} reservas · ${money(c.totalGeneral)}</div></div>
+            <div class="meta">Cortado el ${escHtml(c.fecha)} · ${ent(c.reservas)} reservas · ${money(c.totalGeneral)} vendidos${c.cobrado ? ' · ' + money(c.cobrado) + ' cobrados' : ''}</div></div>
           <div class="acc"><button class="btn btn-chico" data-pdf="${escHtml(c.etiqueta)}">Ver / PDF</button></div>
         </div>`).join('') : '<p class="nota" style="margin-top:14px">Todavía no hiciste ningún corte.</p>'}
     </div>`;
@@ -834,8 +835,9 @@ async function hacerCorte(tl, tp){
   const etiqueta = prompt('Nombre del corte (queda en la planilla y en el PDF):', mesActual());
   if(etiqueta === null) return;
   if(!etiqueta.trim()){ alert('Poné un nombre para el corte.'); return; }
-  if(!confirm('Se van a cortar ' + tl.reservas + ' reservas cobradas por ' + money(tl.totalGeneral) +
-     '.\n\nLas ' + tp.reservas + ' reservas con saldo quedan para el próximo corte. ¿Seguimos?')) return;
+  if(!confirm('Se van a cortar ' + tl.reservas + ' reservas con seña o pago total, por ' + money(tl.totalGeneral) +
+     ' vendidos (' + money(tl.cobrado) + ' cobrados).\n\nLas ' + tp.reservas +
+     ' reservas que no abonaron nada quedan para el próximo corte. ¿Seguimos?')) return;
 
   let error = '';
   const b = $('#btnHacerCorte');
@@ -859,7 +861,7 @@ async function hacerCorte(tl, tp){
       if(Array.isArray(j.objetivos) && j.objetivos.length) objetivos = j.objetivos;
       guardar(); render();
       $('#periodo').textContent = 'Corte "' + j.corte.etiqueta + '" hecho: ' + j.corte.reservas +
-        ' reservas cobradas por ' + money(j.corte.totalGeneral) + '.';
+        ' reservas por ' + money(j.corte.totalGeneral) + ' vendidos · ' + money(j.corte.cobrado) + ' cobrados.';
       imprimirCorte(j.corte, calcActual().filter(r => r.corte === j.corte.etiqueta), j.corte.etiqueta);
       return;
     }catch(e){
@@ -878,11 +880,13 @@ function imprimirCorte(corte, lista, titulo){
     <div class="rep-h">
       <div class="marca"><b>ELETON</b><span>RESORT &amp; SPA</span></div>
       <h1>Reporte de ventas · ${escHtml(cap(titulo))}</h1>
-      <div class="sub">${corte ? 'Corte realizado el ' + escHtml(corte.fecha) : 'Vista previa · corte todavía no confirmado'} · Impreso el ${hoy} · Solo reservas cobradas</div>
+      <div class="sub">${corte ? 'Corte realizado el ' + escHtml(corte.fecha) : 'Vista previa · corte todavía no confirmado'} · Impreso el ${hoy} · Reservas con seña o pago total</div>
     </div>
     <div class="rep-kpis">
-      <div><div class="e">Reservas cobradas</div><div class="v">${ent(t.reservas)}</div></div>
+      <div><div class="e">Reservas</div><div class="v">${ent(t.reservas)}</div></div>
       <div><div class="e">Total vendido</div><div class="v">${money(t.totalGeneral)}</div></div>
+      <div><div class="e">Cobrado</div><div class="v">${money(t.cobrado)}</div></div>
+      <div><div class="e">Saldo a cobrar</div><div class="v">${money(t.saldo)}</div></div>
       <div><div class="e">Total habitación</div><div class="v">${money(t.total)}</div></div>
       <div><div class="e">Plazas adultos</div><div class="v">${ent(t.adultosTotal)}</div></div>
       <div><div class="e">Plazas menores</div><div class="v">${ent(t.ninosTotal)}</div></div>
@@ -893,7 +897,7 @@ function imprimirCorte(corte, lista, titulo){
     <table>
       <thead><tr><th class="l">Fecha</th><th class="l">Reserva</th><th>Ad.</th><th>Men.</th><th>Noches</th>
         <th>Plazas ad.</th><th>Plazas men.</th><th>Valor Adultos</th><th>Valor Menor</th>
-        <th>Total habitación</th><th>Total vendido</th></tr></thead>
+        <th>Total habitación</th><th>Total vendido</th><th>Cobrado</th><th>Saldo</th></tr></thead>
       <tbody>${lista.slice().sort((a,b) => {
           const x = parseFecha(a.fecha), y = parseFecha(b.fecha);
           return (x ? x.a*10000+x.m*100+x.d : 0) - (y ? y.a*10000+y.m*100+y.d : 0);
@@ -901,11 +905,13 @@ function imprimirCorte(corte, lista, titulo){
           <td>${r.adultos}</td><td>${r.ninos}</td><td>${r.noches}</td>
           <td>${ent(r.adultosTotal)}</td><td>${ent(r.ninosTotal)}</td>
           <td>${money(r.valorAdultos)}</td><td>${money(r.valorMenor)}</td>
-          <td>${money(r.total)}</td><td>${money(r.venta)}</td></tr>`).join('')}</tbody>
+          <td>${money(r.total)}</td><td>${money(r.venta)}</td>
+          <td>${money(Math.max(0, r.venta - r.saldo))}</td><td>${money(r.saldo)}</td></tr>`).join('')}</tbody>
       <tfoot><tr><td class="l" colspan="5">Totales</td><td>${ent(t.adultosTotal)}</td><td>${ent(t.ninosTotal)}</td>
-        <td>${money(t.valAdultos)}</td><td>${money(t.valMenor)}</td><td>${money(t.total)}</td><td>${money(t.totalGeneral)}</td></tr></tfoot>
+        <td>${money(t.valAdultos)}</td><td>${money(t.valMenor)}</td><td>${money(t.total)}</td>
+        <td>${money(t.totalGeneral)}</td><td>${money(t.cobrado)}</td><td>${money(t.saldo)}</td></tr></tfoot>
     </table>
-    <p class="pie">Quedan ${ent(tp.reservas)} reservas con saldo pendiente por ${money(tp.totalGeneral)}, que pasan al próximo corte.
+    <p class="pie">Quedan ${ent(tp.reservas)} reservas sin ningún pago por ${money(tp.totalGeneral)}, que pasan al próximo corte.
       Plazas = personas × noches. Documento interno de Eleton Resort &amp; SPA.</p>`;
   setTimeout(() => window.print(), 150);
 }
