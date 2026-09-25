@@ -189,6 +189,42 @@
   .bpista i.f{background:#c9769a}
   .bpista i.x{background:#a9a68f}
 
+  .corte-caja{background:var(--blanco);border:1px solid var(--linea);border-radius:3px;padding:18px}
+  .corte-resumen{display:flex;flex-wrap:wrap;gap:22px;align-items:flex-end}
+  .corte-dato .et{font-size:11.5px;color:var(--texto-suave);letter-spacing:.05em}
+  .corte-dato .vl{font-family:"Playfair Display",Georgia,serif;font-weight:900;font-size:24px;color:var(--verde-oscuro);line-height:1.15}
+  .corte-dato .sb{font-size:12px;color:var(--texto-suave)}
+  .corte-acciones{margin-left:auto;display:flex;gap:10px;flex-wrap:wrap}
+  .corte-lista{margin-top:16px}
+  .corte-item{display:flex;flex-wrap:wrap;gap:12px;align-items:center;border-top:1px solid var(--linea);padding:12px 0}
+  .corte-item .tit{font-weight:700;color:var(--verde-oscuro);text-transform:capitalize}
+  .corte-item .meta{font-size:12.5px;color:var(--texto-suave)}
+  .corte-item .acc{margin-left:auto;display:flex;gap:8px}
+  #imprimible{display:none}
+
+  @media print{
+    body{background:#fff !important}
+    body > *{display:none !important}
+    #imprimible{display:block !important}
+    #imprimible .rep-h{border-bottom:3px solid #0d543f;padding-bottom:10px;margin-bottom:18px}
+    #imprimible .marca b{font-family:"Playfair Display",Georgia,serif;font-size:17px;letter-spacing:.22em;color:#0d543f}
+    #imprimible .marca span{font-size:10px;letter-spacing:.16em;color:#5d6b65;margin-left:8px}
+    #imprimible h1{font-family:"Playfair Display",Georgia,serif;font-size:26px;color:#0d543f;margin:10px 0 2px}
+    #imprimible .sub{font-size:12px;color:#5d6b65}
+    #imprimible .rep-kpis{display:flex;flex-wrap:wrap;gap:16px 34px;margin:18px 0 22px}
+    #imprimible .rep-kpis .e{font-size:10px;letter-spacing:.06em;color:#5d6b65;text-transform:uppercase}
+    #imprimible .rep-kpis .v{font-family:"Playfair Display",Georgia,serif;font-size:19px;color:#252525}
+    #imprimible table{border-collapse:collapse;width:100%;font-size:10.5px}
+    #imprimible th{background:#e6f0ec;color:#0d543f;text-align:right;padding:5px 6px;border-bottom:1px solid #cfdad5;font-size:9.5px;text-transform:uppercase}
+    #imprimible th.l,#imprimible td.l{text-align:left}
+    #imprimible td{text-align:right;padding:4px 6px;border-bottom:1px solid #eceee9}
+    #imprimible tfoot td{border-top:2px solid #0d543f;font-weight:700}
+    #imprimible .pie{margin-top:16px;font-size:10.5px;color:#5d6b65}
+    thead{display:table-header-group}
+    tr{page-break-inside:avoid}
+    @page{margin:14mm}
+  }
+
   .paginador{display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:10px;margin-top:12px}
   .paginador .info{font-size:12.5px;color:var(--texto-suave)}
   .paginador .pags{display:flex;flex-wrap:wrap;gap:4px}
@@ -246,6 +282,8 @@
     </div>
   </div>
 </div>
+
+<div id="imprimible"></div>
 
 <canvas id="fuegos"></canvas>
 <div id="festejo" role="status">
@@ -306,6 +344,12 @@
     <h2>Objetivos de venta</h2>
     <p class="nota">Se comparan contra las reservas cargadas, por mes de la fecha de reserva. Los objetivos se cargan en la hoja “Objetivos” de la planilla.</p>
     <div class="objetivos" id="listaObjetivos"></div>
+  </section>
+
+  <section class="seccion" id="bloqueCortes">
+    <h2>Cortes mensuales · reporte de lo vendido</h2>
+    <p class="nota">El corte toma las reservas totalmente pagas que todavía no entraron en ningún corte. Las que tengan saldo quedan para el corte siguiente. El conteo de plazas no se modifica.</p>
+    <div class="corte-caja" id="cajaCortes"></div>
   </section>
 
   <section class="seccion" id="bloqueTemporada">
@@ -425,6 +469,7 @@ let objetivos = [
   { mes: '2026-12', reservas: 196, ticket: 2412583, total: 472866368 }
 ];
 const festejados = new Set();
+let cortes = [];
 
 const MESES = ['enero','febrero','marzo','abril','mayo','junio','julio','agosto','septiembre','octubre','noviembre','diciembre'];
 const nfMoneda = new Intl.NumberFormat('es-AR',{minimumFractionDigits:2,maximumFractionDigits:2});
@@ -648,12 +693,12 @@ function render(){
   const canceladas = todas.filter(r => r.cancelada).length;
   const calc = todas.filter(r => !r.cancelada);
   const vacio = calc.length === 0;
-  ['#bloqueKpis','#bloqueMeses','#bloqueDetalle','#filtros','#bloqueTemporada','#bloqueGrupo','#bloquePerfil'].forEach(s => $(s).style.display = vacio ? 'none' : '');
+  ['#bloqueKpis','#bloqueMeses','#bloqueDetalle','#filtros','#bloqueTemporada','#bloqueGrupo','#bloquePerfil','#bloqueCortes'].forEach(s => $(s).style.display = vacio ? 'none' : '');
   $('#bloqueVacio').style.display = vacio ? '' : 'none';
   $('#textoVacio').textContent = params.url
     ? 'La planilla todavía no tiene reservas. Cargá el reporte de Cloudbeds y se guarda ahí para todos.'
     : 'Esta app todavía no está conectada a la planilla. Abrila desde el enlace para compartir, o pegá el enlace de la planilla en “Parámetros de cálculo”.';
-  if(vacio){ renderObjetivos([]); return; }
+  if(vacio){ renderObjetivos([]); renderCortes([]); return; }
 
   // selector de meses
   const meses = [...new Set(calc.map(r => claveMes(parseFecha(r.fecha))))].sort();
@@ -680,6 +725,7 @@ function render(){
     (canceladas ? ' · ' + canceladas + (canceladas === 1 ? ' cancelada excluida' : ' canceladas excluidas') : '');
 
   renderPerfil(vista);
+  renderCortes(calc);
 
   const raros = vista.filter(r => r.saldo > r.venta + 1).length;
   const av = $('#avisoSaldo');
@@ -734,6 +780,134 @@ function render(){
   document.querySelectorAll('.mes-link').forEach(b => b.onclick = () => { $('#fMes').value = b.dataset.mes; pagina = 1; render(); });
 
   renderObjetivos(calc);
+}
+
+/* ---------- cortes mensuales ---------- */
+const mesActual = () => { const d = new Date(); return MESES[d.getMonth()] + ' ' + d.getFullYear(); };
+const calcActual = () => datos.map(calcular).filter(r => !r.cancelada);
+function totalesCorte(lista){
+  return lista.reduce((t,r) => ({
+    reservas:t.reservas+1, adultosTotal:t.adultosTotal+r.adultosTotal, ninosTotal:t.ninosTotal+r.ninosTotal,
+    valAdultos:t.valAdultos+r.valorAdultos, valMenor:t.valMenor+r.valorMenor,
+    total:t.total+r.total, totalGeneral:t.totalGeneral+r.venta
+  }), {reservas:0,adultosTotal:0,ninosTotal:0,valAdultos:0,valMenor:0,total:0,totalGeneral:0});
+}
+
+function renderCortes(calc){
+  const caja = $('#cajaCortes');
+  if(!params.url && !EN_PLANILLA){
+    caja.innerHTML = '<p class="nota">Los cortes se guardan en la planilla. Conectá la app para poder usarlos.</p>';
+    return;
+  }
+  const listas = calc.filter(r => !r.corte && r.saldo < 1);
+  const pendientes = calc.filter(r => !r.corte && r.saldo >= 1);
+  const tl = totalesCorte(listas), tp = totalesCorte(pendientes);
+
+  caja.innerHTML = `<div class="corte-resumen">
+      <div class="corte-dato"><div class="et">Listas para cortar</div><div class="vl">${ent(tl.reservas)}</div>
+        <div class="sb">${money(tl.totalGeneral)} cobrados</div></div>
+      <div class="corte-dato"><div class="et">Pasan al próximo corte</div><div class="vl">${ent(tp.reservas)}</div>
+        <div class="sb">${money(tp.totalGeneral)} sin cobrar</div></div>
+      <div class="corte-acciones">
+        <button class="btn btn-chico" id="btnVerPrevio">Ver detalle</button>
+        <button class="btn btn-chico" id="btnHacerCorte" style="background:var(--verde-oscuro);color:#fff;border-color:var(--verde-oscuro)">Hacer corte</button>
+      </div>
+    </div>
+    <div class="corte-lista">
+      ${cortes.length ? cortes.slice().reverse().map(c => `<div class="corte-item">
+          <div><div class="tit">${escHtml(c.etiqueta)}</div>
+            <div class="meta">Cortado el ${escHtml(c.fecha)} · ${ent(c.reservas)} reservas · ${money(c.totalGeneral)}</div></div>
+          <div class="acc"><button class="btn btn-chico" data-pdf="${escHtml(c.etiqueta)}">Ver / PDF</button></div>
+        </div>`).join('') : '<p class="nota" style="margin-top:14px">Todavía no hiciste ningún corte.</p>'}
+    </div>`;
+
+  $('#btnHacerCorte').disabled = !tl.reservas;
+  $('#btnHacerCorte').onclick = () => hacerCorte(tl, tp);
+  $('#btnVerPrevio').onclick = () => imprimirCorte(null, listas, 'Previo al corte · ' + mesActual());
+  caja.querySelectorAll('button[data-pdf]').forEach(b => b.onclick = () => {
+    const et = b.dataset.pdf;
+    imprimirCorte(cortes.find(c => c.etiqueta === et), calc.filter(r => r.corte === et), et);
+  });
+}
+
+async function hacerCorte(tl, tp){
+  const etiqueta = prompt('Nombre del corte (queda en la planilla y en el PDF):', mesActual());
+  if(etiqueta === null) return;
+  if(!etiqueta.trim()){ alert('Poné un nombre para el corte.'); return; }
+  if(!confirm('Se van a cortar ' + tl.reservas + ' reservas cobradas por ' + money(tl.totalGeneral) +
+     '.\n\nLas ' + tp.reservas + ' reservas con saldo quedan para el próximo corte. ¿Seguimos?')) return;
+
+  let error = '';
+  const b = $('#btnHacerCorte');
+  while(true){
+    const clave = await pedirClaveCarga(tl.reservas, error);
+    if(!clave){ $('#periodo').textContent = 'Corte cancelado.'; return; }
+    b.disabled = true; b.textContent = 'Cortando…';
+    try{
+      const r = await fetch(params.url, {
+        method: 'POST', headers: {'Content-Type': 'text/plain;charset=utf-8'},
+        body: JSON.stringify({token: TOKEN_PLANILLA, clave: clave, accion: 'corte', etiqueta: etiqueta.trim()})
+      });
+      if(!r.ok) throw new Error('el enlace respondió ' + r.status);
+      const j = await r.json();
+      if(j.error){
+        if(/clave de carga incorrecta/i.test(j.error)){ error = 'Clave incorrecta.'; continue; }
+        throw new Error(j.error);
+      }
+      datos = desdePlanilla(j.reservas || []);
+      if(Array.isArray(j.cortes)) cortes = j.cortes;
+      if(Array.isArray(j.objetivos) && j.objetivos.length) objetivos = j.objetivos;
+      guardar(); render();
+      $('#periodo').textContent = 'Corte "' + j.corte.etiqueta + '" hecho: ' + j.corte.reservas +
+        ' reservas cobradas por ' + money(j.corte.totalGeneral) + '.';
+      imprimirCorte(j.corte, calcActual().filter(r => r.corte === j.corte.etiqueta), j.corte.etiqueta);
+      return;
+    }catch(e){
+      $('#periodo').textContent = 'No se pudo hacer el corte: ' + e.message;
+      return;
+    }finally{ b.disabled = false; b.textContent = 'Hacer corte'; }
+  }
+}
+
+function imprimirCorte(corte, lista, titulo){
+  if(!valoresVisibles){ pedirClaveValores(() => imprimirCorte(corte, lista, titulo)); return; }
+  const t = totalesCorte(lista);
+  const hoy = new Date().toLocaleDateString('es-AR');
+  const tp = totalesCorte(calcActual().filter(r => !r.corte && r.saldo >= 1));
+  $('#imprimible').innerHTML = `
+    <div class="rep-h">
+      <div class="marca"><b>ELETON</b><span>RESORT &amp; SPA</span></div>
+      <h1>Reporte de ventas · ${escHtml(cap(titulo))}</h1>
+      <div class="sub">${corte ? 'Corte realizado el ' + escHtml(corte.fecha) : 'Vista previa · corte todavía no confirmado'} · Impreso el ${hoy} · Solo reservas cobradas</div>
+    </div>
+    <div class="rep-kpis">
+      <div><div class="e">Reservas cobradas</div><div class="v">${ent(t.reservas)}</div></div>
+      <div><div class="e">Total vendido</div><div class="v">${money(t.totalGeneral)}</div></div>
+      <div><div class="e">Total habitación</div><div class="v">${money(t.total)}</div></div>
+      <div><div class="e">Plazas adultos</div><div class="v">${ent(t.adultosTotal)}</div></div>
+      <div><div class="e">Plazas menores</div><div class="v">${ent(t.ninosTotal)}</div></div>
+      <div><div class="e">Total de plazas</div><div class="v">${ent(t.adultosTotal + t.ninosTotal)}</div></div>
+      <div><div class="e">Valor Adultos</div><div class="v">${money(t.valAdultos)}</div></div>
+      <div><div class="e">Valor Menor</div><div class="v">${money(t.valMenor)}</div></div>
+    </div>
+    <table>
+      <thead><tr><th class="l">Fecha</th><th class="l">Reserva</th><th>Ad.</th><th>Men.</th><th>Noches</th>
+        <th>Plazas ad.</th><th>Plazas men.</th><th>Valor Adultos</th><th>Valor Menor</th>
+        <th>Total habitación</th><th>Total vendido</th></tr></thead>
+      <tbody>${lista.slice().sort((a,b) => {
+          const x = parseFecha(a.fecha), y = parseFecha(b.fecha);
+          return (x ? x.a*10000+x.m*100+x.d : 0) - (y ? y.a*10000+y.m*100+y.d : 0);
+        }).map(r => `<tr><td class="l">${escHtml(r.fecha)}</td><td class="l">${escHtml(r.nro)}</td>
+          <td>${r.adultos}</td><td>${r.ninos}</td><td>${r.noches}</td>
+          <td>${ent(r.adultosTotal)}</td><td>${ent(r.ninosTotal)}</td>
+          <td>${money(r.valorAdultos)}</td><td>${money(r.valorMenor)}</td>
+          <td>${money(r.total)}</td><td>${money(r.venta)}</td></tr>`).join('')}</tbody>
+      <tfoot><tr><td class="l" colspan="5">Totales</td><td>${ent(t.adultosTotal)}</td><td>${ent(t.ninosTotal)}</td>
+        <td>${money(t.valAdultos)}</td><td>${money(t.valMenor)}</td><td>${money(t.total)}</td><td>${money(t.totalGeneral)}</td></tr></tfoot>
+    </table>
+    <p class="pie">Quedan ${ent(tp.reservas)} reservas con saldo pendiente por ${money(tp.totalGeneral)}, que pasan al próximo corte.
+      Plazas = personas × noches. Documento interno de Eleton Resort &amp; SPA.</p>`;
+  setTimeout(() => window.print(), 150);
 }
 
 /* ---------- temporada, tipo de reserva y perfil del huésped ---------- */
@@ -1037,7 +1211,7 @@ $('#claveValores').addEventListener('click', e => { if(e.target.id === 'claveVal
 /* ---------- conexión con la planilla ---------- */
 const desdePlanilla = arr => arr.map(a => ({fecha:a[0], nro:String(a[1]), adultos:a[2], ninos:a[3], noches:a[4], menorSinIva:a[5], total:a[6], saldo:a[7],
   totalGeneral:a[8] || 0, genero:a[9] || '', provincia:a[10] || '', pais:a[11] || '', edad:(a[12] === '' || a[12] == null) ? null : a[12],
-  llegada:a[13] || '', salida:a[14] || '', estado:a[15] || ''}));
+  llegada:a[13] || '', salida:a[14] || '', estado:a[15] || '', corte:a[16] || ''}));
 
 let _resolverCarga = null;
 function pedirClaveCarga(cantidad, error){
@@ -1081,6 +1255,7 @@ async function subirAPlanilla(nuevas, campos){
       }
       datos = desdePlanilla(j.reservas || []);
       if(Array.isArray(j.objetivos) && j.objetivos.length) objetivos = j.objetivos;
+      if(Array.isArray(j.cortes)) cortes = j.cortes;
       pagina = 1; guardar(); render();
       $('#periodo').textContent = 'Guardado en la planilla: ' + j.agregadas + ' nuevas y ' + j.actualizadas +
         ' actualizadas · ' + j.sinPago + ' sin pago · ' + new Date().toLocaleTimeString('es-AR');
@@ -1110,6 +1285,7 @@ async function sincronizar(){
     if(j.error) throw new Error(j.error);
     if(Array.isArray(j.reservas)) datos = desdePlanilla(j.reservas);   // la planilla manda, aunque esté vacía
     if(Array.isArray(j.objetivos) && j.objetivos.length) objetivos = j.objetivos;
+    if(Array.isArray(j.cortes)) cortes = j.cortes;
     guardar(); render();
     $('#periodo').textContent = datos.length + ' reservas y ' + objetivos.length +
       ' objetivos leídos de la planilla · ' + new Date().toLocaleTimeString('es-AR');
