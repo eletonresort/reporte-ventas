@@ -1,4 +1,4 @@
-<!DOCTYPE html>
+  <!DOCTYPE html>
 <html lang="es-AR" data-theme="light">
 <head>
 <meta charset="utf-8">
@@ -348,7 +348,7 @@
 
   <section class="seccion" id="bloqueCortes">
     <h2>Cortes mensuales · reporte de lo vendido</h2>
-    <p class="nota">El corte toma las reservas con seña o pago total que todavía no entraron en ningún corte. Las que no abonaron nada quedan para el corte siguiente. El conteo de plazas no se modifica.</p>
+    <p class="nota">El corte toma las reservas con seña o pago total que todavía no entraron en ningún corte, más los ajustes de reservas ya cortadas que después cambiaron (noches o personas agregadas, cancelaciones). Las que no abonaron nada quedan para el corte siguiente. El conteo de plazas no se modifica.</p>
     <div class="corte-caja" id="cajaCortes"></div>
   </section>
 
@@ -470,6 +470,7 @@ let objetivos = [
 ];
 const festejados = new Set();
 let cortes = [];
+let acumulados = {};
 
 const MESES = ['enero','febrero','marzo','abril','mayo','junio','julio','agosto','septiembre','octubre','noviembre','diciembre'];
 const nfMoneda = new Intl.NumberFormat('es-AR',{minimumFractionDigits:2,maximumFractionDigits:2});
@@ -725,7 +726,7 @@ function render(){
     (canceladas ? ' · ' + canceladas + (canceladas === 1 ? ' cancelada excluida' : ' canceladas excluidas') : '');
 
   renderPerfil(vista);
-  renderCortes(calc);
+  renderCortes(todas);
 
   const raros = vista.filter(r => r.saldo > r.venta + 1).length;
   const av = $('#avisoSaldo');
@@ -784,29 +785,65 @@ function render(){
 
 /* ---------- cortes mensuales ---------- */
 const mesActual = () => { const d = new Date(); return MESES[d.getMonth()] + ' ' + d.getFullYear(); };
-const calcActual = () => datos.map(calcular).filter(r => !r.cancelada);
-function totalesCorte(lista){
-  return lista.reduce((t,r) => ({
-    reservas:t.reservas+1, adultosTotal:t.adultosTotal+r.adultosTotal, ninosTotal:t.ninosTotal+r.ninosTotal,
-    valAdultos:t.valAdultos+r.valorAdultos, valMenor:t.valMenor+r.valorMenor,
-    total:t.total+r.total, totalGeneral:t.totalGeneral+r.venta,
-    cobrado:t.cobrado+Math.max(0, r.venta - r.saldo), saldo:t.saldo+r.saldo
-  }), {reservas:0,adultosTotal:0,ninosTotal:0,valAdultos:0,valMenor:0,total:0,totalGeneral:0,cobrado:0,saldo:0});
+const calcActual = () => datos.map(calcular);
+const CLAVES_VAL = ['adultos','ninos','noches','adultosTotal','ninosTotal','valAdultos','valMenor','total','totalGeneral','cobrado','saldo'];
+
+function valoresRes(r){
+  if(r.cancelada){ const z = {}; CLAVES_VAL.forEach(k => z[k] = 0); return z; }
+  return { adultos:r.adultos, ninos:r.ninos, noches:r.noches, adultosTotal:r.adultosTotal, ninosTotal:r.ninosTotal,
+    valAdultos:r.valorAdultos, valMenor:r.valorMenor, total:r.total, totalGeneral:r.venta,
+    cobrado:Math.max(0, r.venta - r.saldo), saldo:r.saldo };
+}
+function restar(a, b){ const o = {}; CLAVES_VAL.forEach(k => o[k] = (a[k] || 0) - (b[k] || 0)); return o; }
+function totalesValores(filas){
+  const t = { reservas: filas.length };
+  CLAVES_VAL.forEach(k => t[k] = 0);
+  filas.forEach(f => CLAVES_VAL.forEach(k => t[k] += (f[k] || 0)));
+  return t;
+}
+function hayDiferencia(d){
+  return Math.abs(d.totalGeneral) >= 1 || Math.abs(d.total) >= 1 || d.adultosTotal !== 0 || d.ninosTotal !== 0 || Math.abs(d.cobrado) >= 1;
+}
+function textoAjuste(r, d){
+  if(r.cancelada) return 'Reserva cancelada después del corte';
+  const p = [];
+  const s = n => (n > 0 ? '+' : '') + n;
+  if(d.noches) p.push(s(d.noches) + ' noche' + (Math.abs(d.noches) === 1 ? '' : 's'));
+  if(d.adultos) p.push(s(d.adultos) + ' adulto' + (Math.abs(d.adultos) === 1 ? '' : 's'));
+  if(d.ninos) p.push(s(d.ninos) + ' menor' + (Math.abs(d.ninos) === 1 ? '' : 'es'));
+  return p.length ? p.join(' · ') : 'Cambio de importe';
+}
+/* filas listas para cortar: reservas nuevas con seña + ajustes de reservas ya cortadas que cambiaron */
+function filasDelProximoCorte(todas){
+  const nuevas = todas.filter(r => !r.cancelada && !r.corte && !r.sinPago)
+    .map(r => Object.assign({nro:r.nro, fecha:r.fecha, tipo:'Nueva', nota:''}, valoresRes(r)));
+  const ajustes = [];
+  todas.forEach(r => {
+    const a = acumulados[r.nro];
+    if(!r.corte || !a) return;
+    const d = restar(valoresRes(r), a);
+    if(hayDiferencia(d)) ajustes.push(Object.assign({nro:r.nro, fecha:r.fecha, tipo:'Ajuste', nota:textoAjuste(r, d)}, d));
+  });
+  return { nuevas, ajustes };
 }
 
-function renderCortes(calc){
+function renderCortes(todas){
   const caja = $('#cajaCortes');
   if(!params.url && !EN_PLANILLA){
     caja.innerHTML = '<p class="nota">Los cortes se guardan en la planilla. Conectá la app para poder usarlos.</p>';
     return;
   }
-  const listas = calc.filter(r => !r.corte && !r.sinPago);        // con seña o pago total
-  const pendientes = calc.filter(r => !r.corte && r.sinPago);      // no abonaron nada
-  const tl = totalesCorte(listas), tp = totalesCorte(pendientes);
+  const { nuevas, ajustes } = filasDelProximoCorte(todas);
+  const pendientes = todas.filter(r => !r.cancelada && !r.corte && r.sinPago);
+  const tn = totalesValores(nuevas), ta = totalesValores(ajustes);
+  const tp = totalesValores(pendientes.map(valoresRes));
+  const tTotal = totalesValores(nuevas.concat(ajustes));
 
   caja.innerHTML = `<div class="corte-resumen">
-      <div class="corte-dato"><div class="et">Listas para cortar</div><div class="vl">${ent(tl.reservas)}</div>
-        <div class="sb">${money(tl.totalGeneral)} vendidos · ${money(tl.cobrado)} cobrados</div></div>
+      <div class="corte-dato"><div class="et">Reservas nuevas</div><div class="vl">${ent(tn.reservas)}</div>
+        <div class="sb">${money(tn.totalGeneral)} vendidos</div></div>
+      <div class="corte-dato"><div class="et">Ajustes de cortes anteriores</div><div class="vl">${ent(ta.reservas)}</div>
+        <div class="sb">${ta.reservas ? money(ta.totalGeneral) + ' de diferencia' : 'Sin cambios'}</div></div>
       <div class="corte-dato"><div class="et">Pasan al próximo corte</div><div class="vl">${ent(tp.reservas)}</div>
         <div class="sb">${money(tp.totalGeneral)} sin seña</div></div>
       <div class="corte-acciones">
@@ -817,32 +854,29 @@ function renderCortes(calc){
     <div class="corte-lista">
       ${cortes.length ? cortes.slice().reverse().map(c => `<div class="corte-item">
           <div><div class="tit">${escHtml(c.etiqueta)}</div>
-            <div class="meta">Cortado el ${escHtml(c.fecha)} · ${ent(c.reservas)} reservas · ${money(c.totalGeneral)} vendidos${c.cobrado ? ' · ' + money(c.cobrado) + ' cobrados' : ''}</div></div>
+            <div class="meta">Cortado el ${escHtml(c.fecha)} · ${ent(c.nuevas)} nuevas${c.ajustes ? ' y ' + ent(c.ajustes) + ' ajustes' : ''} · ${money(c.totalGeneral)} vendidos · ${money(c.cobrado)} cobrados</div></div>
           <div class="acc"><button class="btn btn-chico" data-pdf="${escHtml(c.etiqueta)}">Ver / PDF</button></div>
         </div>`).join('') : '<p class="nota" style="margin-top:14px">Todavía no hiciste ningún corte.</p>'}
     </div>`;
 
-  $('#btnHacerCorte').disabled = !tl.reservas;
-  $('#btnHacerCorte').onclick = () => hacerCorte(tl, tp);
-  $('#btnVerPrevio').onclick = () => imprimirCorte(null, listas, 'Previo al corte · ' + mesActual());
-  caja.querySelectorAll('button[data-pdf]').forEach(b => b.onclick = () => {
-    const et = b.dataset.pdf;
-    imprimirCorte(cortes.find(c => c.etiqueta === et), calc.filter(r => r.corte === et), et);
-  });
+  $('#btnHacerCorte').disabled = !tTotal.reservas;
+  $('#btnHacerCorte').onclick = () => hacerCorte(tn, ta, tp);
+  $('#btnVerPrevio').onclick = () => imprimirCorte(null, nuevas.concat(ajustes), 'Previo al corte · ' + mesActual());
+  caja.querySelectorAll('button[data-pdf]').forEach(b => b.onclick = () => abrirCorteGuardado(b.dataset.pdf));
 }
 
-async function hacerCorte(tl, tp){
+async function hacerCorte(tn, ta, tp){
   const etiqueta = prompt('Nombre del corte (queda en la planilla y en el PDF):', mesActual());
   if(etiqueta === null) return;
   if(!etiqueta.trim()){ alert('Poné un nombre para el corte.'); return; }
-  if(!confirm('Se van a cortar ' + tl.reservas + ' reservas con seña o pago total, por ' + money(tl.totalGeneral) +
-     ' vendidos (' + money(tl.cobrado) + ' cobrados).\n\nLas ' + tp.reservas +
-     ' reservas que no abonaron nada quedan para el próximo corte. ¿Seguimos?')) return;
+  if(!confirm('Se van a cortar ' + tn.reservas + ' reservas nuevas por ' + money(tn.totalGeneral) +
+     (ta.reservas ? ', más ' + ta.reservas + ' ajustes de cortes anteriores por ' + money(ta.totalGeneral) : '') +
+     '.\n\n' + tp.reservas + ' reservas sin seña quedan para el próximo corte. ¿Seguimos?')) return;
 
   let error = '';
   const b = $('#btnHacerCorte');
   while(true){
-    const clave = await pedirClaveCarga(tl.reservas, error);
+    const clave = await pedirClaveCarga(tn.reservas + ta.reservas, error);
     if(!clave){ $('#periodo').textContent = 'Corte cancelado.'; return; }
     b.disabled = true; b.textContent = 'Cortando…';
     try{
@@ -858,11 +892,13 @@ async function hacerCorte(tl, tp){
       }
       datos = desdePlanilla(j.reservas || []);
       if(Array.isArray(j.cortes)) cortes = j.cortes;
+      if(j.acumulados) acumulados = j.acumulados;
       if(Array.isArray(j.objetivos) && j.objetivos.length) objetivos = j.objetivos;
       guardar(); render();
-      $('#periodo').textContent = 'Corte "' + j.corte.etiqueta + '" hecho: ' + j.corte.reservas +
-        ' reservas por ' + money(j.corte.totalGeneral) + ' vendidos · ' + money(j.corte.cobrado) + ' cobrados.';
-      imprimirCorte(j.corte, calcActual().filter(r => r.corte === j.corte.etiqueta), j.corte.etiqueta);
+      $('#periodo').textContent = 'Corte "' + j.corte.etiqueta + '": ' + j.corte.nuevas + ' reservas nuevas' +
+        (j.corte.ajustes ? ' y ' + j.corte.ajustes + ' ajustes' : '') + ' · ' + money(j.corte.totalGeneral) +
+        ' vendidos · ' + money(j.corte.cobrado) + ' cobrados.';
+      abrirCorteGuardado(j.corte.etiqueta);
       return;
     }catch(e){
       $('#periodo').textContent = 'No se pudo hacer el corte: ' + e.message;
@@ -871,11 +907,49 @@ async function hacerCorte(tl, tp){
   }
 }
 
-function imprimirCorte(corte, lista, titulo){
-  if(!valoresVisibles){ pedirClaveValores(() => imprimirCorte(corte, lista, titulo)); return; }
-  const t = totalesCorte(lista);
+/* Imprime un corte tal como se guardó ese día, no con los valores de hoy */
+async function abrirCorteGuardado(etiqueta){
+  const c = cortes.find(x => x.etiqueta === etiqueta);
+  $('#periodo').textContent = 'Buscando el corte "' + etiqueta + '"…';
+  try{
+    const sep = params.url.includes('?') ? '&' : '?';
+    const r = await fetch(params.url + sep + 'datos=1&token=' + encodeURIComponent(TOKEN_PLANILLA) +
+      '&corte=' + encodeURIComponent(etiqueta) + '&t=' + Date.now());
+    const j = await r.json();
+    if(j.error) throw new Error(j.error);
+    $('#periodo').textContent = 'Corte "' + etiqueta + '" · ' + (j.detalle || []).length + ' líneas.';
+    imprimirCorte(c, j.detalle || [], etiqueta);
+  }catch(e){
+    $('#periodo').textContent = 'No pude abrir el corte: ' + e.message;
+  }
+}
+
+function imprimirCorte(corte, filas, titulo){
+  if(!valoresVisibles){ pedirClaveValores(() => imprimirCorte(corte, filas, titulo)); return; }
+  const nuevas = filas.filter(f => f.tipo !== 'Ajuste');
+  const ajustes = filas.filter(f => f.tipo === 'Ajuste');
+  const t = totalesValores(filas), tn = totalesValores(nuevas), ta = totalesValores(ajustes);
   const hoy = new Date().toLocaleDateString('es-AR');
-  const tp = totalesCorte(calcActual().filter(r => !r.corte && r.saldo >= 1));
+  const tp = totalesValores(calcActual().filter(r => !r.cancelada && !r.corte && r.sinPago).map(valoresRes));
+  const orden = l => l.slice().sort((a,b) => {
+    const x = parseFecha(a.fecha), y = parseFecha(b.fecha);
+    return (x ? x.a*10000+x.m*100+x.d : 0) - (y ? y.a*10000+y.m*100+y.d : 0);
+  });
+  const fila = (f, conNota) => `<tr><td class="l">${escHtml(f.fecha)}</td><td class="l">${escHtml(f.nro)}</td>
+      ${conNota ? `<td class="l">${escHtml(f.nota || '')}</td>` : ''}
+      <td>${f.adultos}</td><td>${f.ninos}</td><td>${f.noches}</td>
+      <td>${ent(f.adultosTotal)}</td><td>${ent(f.ninosTotal)}</td>
+      <td>${money(f.valAdultos)}</td><td>${money(f.valMenor)}</td>
+      <td>${money(f.total)}</td><td>${money(f.totalGeneral)}</td><td>${money(f.cobrado)}</td><td>${money(f.saldo)}</td></tr>`;
+  const cabeza = conNota => `<thead><tr><th class="l">Fecha</th><th class="l">Reserva</th>
+      ${conNota ? '<th class="l">Ajuste</th>' : ''}<th>Ad.</th><th>Men.</th><th>Noches</th>
+      <th>Plazas ad.</th><th>Plazas men.</th><th>Valor Adultos</th><th>Valor Menor</th>
+      <th>Total habitación</th><th>Total vendido</th><th>Cobrado</th><th>Saldo</th></tr></thead>`;
+  const pie = (tt, conNota, etiq) => `<tfoot><tr><td class="l" colspan="${conNota ? 6 : 5}">${etiq}</td>
+      <td>${ent(tt.adultosTotal)}</td><td>${ent(tt.ninosTotal)}</td><td>${money(tt.valAdultos)}</td>
+      <td>${money(tt.valMenor)}</td><td>${money(tt.total)}</td><td>${money(tt.totalGeneral)}</td>
+      <td>${money(tt.cobrado)}</td><td>${money(tt.saldo)}</td></tr></tfoot>`;
+
   $('#imprimible').innerHTML = `
     <div class="rep-h">
       <div class="marca"><b>ELETON</b><span>RESORT &amp; SPA</span></div>
@@ -883,7 +957,8 @@ function imprimirCorte(corte, lista, titulo){
       <div class="sub">${corte ? 'Corte realizado el ' + escHtml(corte.fecha) : 'Vista previa · corte todavía no confirmado'} · Impreso el ${hoy} · Reservas con seña o pago total</div>
     </div>
     <div class="rep-kpis">
-      <div><div class="e">Reservas</div><div class="v">${ent(t.reservas)}</div></div>
+      <div><div class="e">Reservas nuevas</div><div class="v">${ent(tn.reservas)}</div></div>
+      <div><div class="e">Ajustes</div><div class="v">${ent(ta.reservas)}</div></div>
       <div><div class="e">Total vendido</div><div class="v">${money(t.totalGeneral)}</div></div>
       <div><div class="e">Cobrado</div><div class="v">${money(t.cobrado)}</div></div>
       <div><div class="e">Saldo a cobrar</div><div class="v">${money(t.saldo)}</div></div>
@@ -894,23 +969,13 @@ function imprimirCorte(corte, lista, titulo){
       <div><div class="e">Valor Adultos</div><div class="v">${money(t.valAdultos)}</div></div>
       <div><div class="e">Valor Menor</div><div class="v">${money(t.valMenor)}</div></div>
     </div>
-    <table>
-      <thead><tr><th class="l">Fecha</th><th class="l">Reserva</th><th>Ad.</th><th>Men.</th><th>Noches</th>
-        <th>Plazas ad.</th><th>Plazas men.</th><th>Valor Adultos</th><th>Valor Menor</th>
-        <th>Total habitación</th><th>Total vendido</th><th>Cobrado</th><th>Saldo</th></tr></thead>
-      <tbody>${lista.slice().sort((a,b) => {
-          const x = parseFecha(a.fecha), y = parseFecha(b.fecha);
-          return (x ? x.a*10000+x.m*100+x.d : 0) - (y ? y.a*10000+y.m*100+y.d : 0);
-        }).map(r => `<tr><td class="l">${escHtml(r.fecha)}</td><td class="l">${escHtml(r.nro)}</td>
-          <td>${r.adultos}</td><td>${r.ninos}</td><td>${r.noches}</td>
-          <td>${ent(r.adultosTotal)}</td><td>${ent(r.ninosTotal)}</td>
-          <td>${money(r.valorAdultos)}</td><td>${money(r.valorMenor)}</td>
-          <td>${money(r.total)}</td><td>${money(r.venta)}</td>
-          <td>${money(Math.max(0, r.venta - r.saldo))}</td><td>${money(r.saldo)}</td></tr>`).join('')}</tbody>
-      <tfoot><tr><td class="l" colspan="5">Totales</td><td>${ent(t.adultosTotal)}</td><td>${ent(t.ninosTotal)}</td>
-        <td>${money(t.valAdultos)}</td><td>${money(t.valMenor)}</td><td>${money(t.total)}</td>
-        <td>${money(t.totalGeneral)}</td><td>${money(t.cobrado)}</td><td>${money(t.saldo)}</td></tr></tfoot>
-    </table>
+    <table>${cabeza(false)}<tbody>${orden(nuevas).map(f => fila(f, false)).join('')}</tbody>
+      ${pie(tn, false, 'Totales de reservas nuevas')}</table>
+    ${ajustes.length ? `<h2 style="font-family:'Playfair Display',serif;color:#0d543f;font-size:15px;margin:20px 0 6px">
+        Ajustes de cortes anteriores</h2>
+      <p style="font-size:10.5px;color:#5d6b65;margin:0 0 8px">Reservas ya informadas que cambiaron después del corte. Se suma solo la diferencia.</p>
+      <table>${cabeza(true)}<tbody>${orden(ajustes).map(f => fila(f, true)).join('')}</tbody>
+        ${pie(ta, true, 'Totales de ajustes')}</table>` : ''}
     <p class="pie">Quedan ${ent(tp.reservas)} reservas sin ningún pago por ${money(tp.totalGeneral)}, que pasan al próximo corte.
       Plazas = personas × noches. Documento interno de Eleton Resort &amp; SPA.</p>`;
   setTimeout(() => window.print(), 150);
@@ -1262,6 +1327,7 @@ async function subirAPlanilla(nuevas, campos){
       datos = desdePlanilla(j.reservas || []);
       if(Array.isArray(j.objetivos) && j.objetivos.length) objetivos = j.objetivos;
       if(Array.isArray(j.cortes)) cortes = j.cortes;
+      if(j.acumulados) acumulados = j.acumulados;
       pagina = 1; guardar(); render();
       $('#periodo').textContent = 'Guardado en la planilla: ' + j.agregadas + ' nuevas y ' + j.actualizadas +
         ' actualizadas · ' + j.sinPago + ' sin pago · ' + new Date().toLocaleTimeString('es-AR');
@@ -1292,6 +1358,7 @@ async function sincronizar(){
     if(Array.isArray(j.reservas)) datos = desdePlanilla(j.reservas);   // la planilla manda, aunque esté vacía
     if(Array.isArray(j.objetivos) && j.objetivos.length) objetivos = j.objetivos;
     if(Array.isArray(j.cortes)) cortes = j.cortes;
+    if(j.acumulados) acumulados = j.acumulados;
     guardar(); render();
     $('#periodo').textContent = datos.length + ' reservas y ' + objetivos.length +
       ' objetivos leídos de la planilla · ' + new Date().toLocaleTimeString('es-AR');
