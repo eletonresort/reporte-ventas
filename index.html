@@ -1,4 +1,4 @@
-  <!DOCTYPE html>
+<!DOCTYPE html>
 <html lang="es-AR" data-theme="light">
 <head>
 <meta charset="utf-8">
@@ -275,6 +275,12 @@
     <h3>Guardar en la planilla</h3>
     <p id="cargaTexto">Ingresá la clave de carga para guardar el reporte en la planilla.</p>
     <div class="campo"><label for="claveCargaInput">Clave de carga</label><input type="password" id="claveCargaInput" autocomplete="off"></div>
+    <div id="avisoBajas" class="oculto" style="background:var(--alerta-fondo);border-left:3px solid var(--alerta);padding:11px 13px;border-radius:2px;margin-bottom:12px">
+      <label class="check" style="align-items:flex-start;padding:0">
+        <input type="checkbox" id="chkBajas" checked style="margin-top:3px">
+        <span style="font-size:12.5px;color:var(--texto)" id="textoBajas"></span>
+      </label>
+    </div>
     <div class="error" id="errorCarga"></div>
     <div class="fila-botones">
       <button class="btn btn-chico" id="btnCancelarCarga">Cancelar</button>
@@ -552,6 +558,19 @@ const num = v => {
 };
 
 const texto = (f, i) => i >= 0 ? String(f[i] == null ? '' : f[i]).trim() : '';
+const claveDia = f => f ? f.a * 10000 + f.m * 100 + f.d : null;
+/* Reservas que están en la planilla dentro del período que cubre el archivo pero no vienen en él:
+   normalmente son cancelaciones, porque el reporte de Cloudbeds no exporta las canceladas. */
+function posiblesBajas(nuevas){
+  const dias = nuevas.map(r => claveDia(parseFecha(r.fecha))).filter(Boolean);
+  if(dias.length < 2) return [];
+  const desde = Math.min(...dias), hasta = Math.max(...dias);
+  const vienen = new Set(nuevas.map(r => r.nro));
+  return datos.filter(r => {
+    const k = claveDia(parseFecha(r.fecha));
+    return k !== null && k >= desde && k <= hasta && !vienen.has(r.nro) && !/cancel|no se present|no.?show/i.test(r.estado || '');
+  }).map(r => r.nro);
+}
 function fechaOVacio(f, i){
   if(i < 0) return '';
   const p = parseFecha(f[i]);
@@ -636,7 +655,7 @@ function importar(filas){
   nuevas.forEach(r => { r.edad = calcEdad(r.nacimiento, r.llegada || r.fecha); r.estadoReserva = r.estado; });
   if(!nuevas.length) throw new Error('No encontré reservas en el archivo.');
 
-  if(params.url && !EN_PLANILLA){ subirAPlanilla(nuevas, campos); return; }
+  if(params.url && !EN_PLANILLA){ subirAPlanilla(nuevas, campos, posiblesBajas(nuevas)); return; }
 
   // sin planilla: se combina con lo guardado, pisando solo las columnas que trajo el archivo
   const clavesLocales = campos.filter(k => k !== 'nacimiento' && k !== 'estadoReserva').concat(campos.includes('estadoReserva') ? ['estado'] : [], campos.includes('nacimiento') ? ['edad'] : []);
@@ -876,7 +895,7 @@ async function hacerCorte(tn, ta, tp){
   let error = '';
   const b = $('#btnHacerCorte');
   while(true){
-    const clave = await pedirClaveCarga(tn.reservas + ta.reservas, error);
+    const clave = await pedirClaveCarga(tn.reservas + ta.reservas, error, null);
     if(!clave){ $('#periodo').textContent = 'Corte cancelado.'; return; }
     b.disabled = true; b.textContent = 'Cortando…';
     try{
@@ -1285,9 +1304,17 @@ const desdePlanilla = arr => arr.map(a => ({fecha:a[0], nro:String(a[1]), adulto
   llegada:a[13] || '', salida:a[14] || '', estado:a[15] || '', corte:a[16] || ''}));
 
 let _resolverCarga = null;
-function pedirClaveCarga(cantidad, error){
+function pedirClaveCarga(cantidad, error, bajas){
   return new Promise(res => {
     _resolverCarga = res;
+    const av = $('#avisoBajas');
+    av.classList.toggle('oculto', !bajas || !bajas.length);
+    if(bajas && bajas.length){
+      $('#chkBajas').checked = true;
+      $('#textoBajas').textContent = 'Hay ' + bajas.length + (bajas.length === 1 ? ' reserva' : ' reservas') +
+        ' en la planilla, dentro del período que cubre este archivo, que no vienen en él (' +
+        bajas.slice(0, 3).join(', ') + (bajas.length > 3 ? '…' : '') + '). Marcarlas como canceladas.';
+    }
     $('#cargaTexto').textContent = 'Se van a guardar ' + cantidad + (cantidad === 1 ? ' reserva' : ' reservas') +
       ' en la planilla. Las que ya estén (mismo número de reserva) se actualizan, no se duplican.';
     $('#errorCarga').textContent = error || '';
@@ -1303,12 +1330,14 @@ function cerrarCarga(valor){
 $('#btnConfirmarCarga').onclick = () => cerrarCarga($('#claveCargaInput').value);
 $('#btnCancelarCarga').onclick = () => cerrarCarga(null);
 $('#claveCargaInput').addEventListener('keydown', e => { if(e.key === 'Enter') cerrarCarga($('#claveCargaInput').value); });
+const bajasElegidas = () => $('#avisoBajas').classList.contains('oculto') ? false : $('#chkBajas').checked;
 
-async function subirAPlanilla(nuevas, campos){
+async function subirAPlanilla(nuevas, campos, bajas){
   let error = '';
   const b = $('#btnCargar');
   while(true){
-    const clave = await pedirClaveCarga(nuevas.length, error);
+    const clave = await pedirClaveCarga(nuevas.length, error, bajas);
+    const marcarBajas = bajasElegidas();
     if(!clave){ $('#periodo').textContent = 'Carga cancelada: no se guardó nada en la planilla.'; return; }
     b.disabled = true; b.textContent = 'Guardando…';
     $('#periodo').textContent = 'Guardando ' + nuevas.length + ' reservas en la planilla…';
@@ -1316,7 +1345,8 @@ async function subirAPlanilla(nuevas, campos){
       const r = await fetch(params.url, {
         method: 'POST',
         headers: {'Content-Type': 'text/plain;charset=utf-8'},
-        body: JSON.stringify({token: TOKEN_PLANILLA, clave: clave, reservas: nuevas, campos: campos})
+        body: JSON.stringify({token: TOKEN_PLANILLA, clave: clave, reservas: nuevas, campos: campos,
+          bajas: marcarBajas ? bajas : []})
       });
       if(!r.ok) throw new Error('el enlace respondió ' + r.status);
       const j = await r.json();
@@ -1330,7 +1360,8 @@ async function subirAPlanilla(nuevas, campos){
       if(j.acumulados) acumulados = j.acumulados;
       pagina = 1; guardar(); render();
       $('#periodo').textContent = 'Guardado en la planilla: ' + j.agregadas + ' nuevas y ' + j.actualizadas +
-        ' actualizadas · ' + j.sinPago + ' sin pago · ' + new Date().toLocaleTimeString('es-AR');
+        ' actualizadas' + (j.bajas ? ' · ' + j.bajas + ' marcadas como canceladas' : '') +
+        ' · ' + j.sinPago + ' sin pago · ' + new Date().toLocaleTimeString('es-AR');
       return;
     }catch(e){
       $('#periodo').textContent = 'No se pudo guardar en la planilla (' + e.message + '). No se cargó nada.';
